@@ -1,0 +1,8 @@
+.env
+output/
+temp/
+__pycache__/
+*.pyc
+*.mp3
+*.wav
+*.mp4

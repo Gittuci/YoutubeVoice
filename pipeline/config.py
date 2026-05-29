@@ -9,7 +9,7 @@ google_api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
 
 GEMINI_VISION_MODEL = "gemini-2.5-flash"
-GEMINI_TTS_MODEL = "gemini-3.1-flash-tts-preview"
+GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts"
 DEEPSEEK_MODEL = "deepseek-chat"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 

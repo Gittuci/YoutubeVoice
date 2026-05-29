@@ -192,8 +192,9 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
         safe_print(f"      Audio: {actual_duration:.2f}s (window: {window_duration:.2f}s)")
 
         if actual_duration > window_duration:
-            target_samples = int(window_duration * sample_rate * config.CHANNELS * 2)
-            pcm = pcm[:target_samples]
+            target_bytes = int(window_duration * sample_rate * config.CHANNELS * 2)
+            target_bytes -= target_bytes % 2  # force even (16-bit sample boundary)
+            pcm = pcm[:target_bytes]
             segment_duration = window_duration
         else:
             segment_duration = actual_duration
@@ -222,35 +223,51 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
 def align_and_concat(segments, sample_rate):
     """
     Concatenate audio segments with proper time alignment and silence gaps.
-    Applies fade-in on segment boundaries to avoid clicks.
+    Applies fade-in AND fade-out on every segment boundary to eliminate clicks.
     """
     if not segments:
         return b""
 
     concat_input = io.BytesIO()
     prev_end = None
-    fade_time = 0.01
+    fade_time = 0.02  # 20ms fade for smoother transitions
+    channels = config.CHANNELS
+    bytes_per_sample = 2
+    bytes_per_second = sample_rate * channels * bytes_per_sample
+    min_segment_bytes = int(fade_time * 2 * bytes_per_second)  # need enough for both fades
 
     for pcm, duration, entry in segments:
         start_s = entry["start_seconds"]
 
+        # Insert silence gap if there's space between segments
         if prev_end is not None and start_s > prev_end:
             gap = start_s - prev_end
             silence = _generate_silence(gap, sample_rate)
             concat_input.write(silence)
 
-        if fade_time > 0 and len(pcm) > int(fade_time * sample_rate * config.CHANNELS * 2):
-            fade_samples = int(fade_time * sample_rate * config.CHANNELS * 2)
-            pcm_array = bytearray(pcm)
+        pcm_array = bytearray(pcm)
+
+        # Apply fade-in to the beginning of the segment
+        fade_samples = int(fade_time * sample_rate * channels)
+        if fade_samples > 0 and len(pcm_array) >= fade_samples * bytes_per_sample:
             for s in range(fade_samples):
                 factor = float(s) / fade_samples
-                pos = s * 2
-                sample = int.from_bytes(pcm_array[pos:pos + 2], "little", signed=True)
-                sample = int(sample * factor)
-                pcm_array[pos:pos + 2] = sample.to_bytes(2, "little", signed=True)
-            pcm = bytes(pcm_array)
+                pos = s * bytes_per_sample
+                val = int.from_bytes(pcm_array[pos:pos + bytes_per_sample], "little", signed=True)
+                val = int(val * factor)
+                pcm_array[pos:pos + bytes_per_sample] = val.to_bytes(bytes_per_sample, "little", signed=True)
 
-        concat_input.write(pcm)
+        # Apply fade-out to the end of the segment
+        if fade_samples > 0 and len(pcm_array) >= fade_samples * bytes_per_sample:
+            end_offset = len(pcm_array) - (fade_samples * bytes_per_sample)
+            for s in range(fade_samples):
+                factor = 1.0 - (float(s) / fade_samples)
+                pos = end_offset + (s * bytes_per_sample)
+                val = int.from_bytes(pcm_array[pos:pos + bytes_per_sample], "little", signed=True)
+                val = int(val * factor)
+                pcm_array[pos:pos + bytes_per_sample] = val.to_bytes(bytes_per_sample, "little", signed=True)
+
+        concat_input.write(bytes(pcm_array))
         prev_end = start_s + duration
 
     return concat_input.getvalue()

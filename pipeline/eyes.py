@@ -129,7 +129,7 @@ def parse_srt_from_text(text: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 2: Video → SRT analysis")
+    parser = argparse.ArgumentParser(description="Phase 2: Video -> SRT analysis")
     parser.add_argument("--url", required=True, help="YouTube video URL")
     parser.add_argument("--output", default=config.OUTPUT_DIR, help="Output directory")
     args = parser.parse_args()

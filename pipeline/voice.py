@@ -269,7 +269,7 @@ def align_and_concat(segments, sample_rate):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 4: SRT → MP3 Voiceover")
+    parser = argparse.ArgumentParser(description="Phase 4: SRT -> MP3 Voiceover")
     parser.add_argument("--input-dir", default=config.OUTPUT_DIR, help="Directory containing master_*.srt files")
     parser.add_argument("--output-dir", default=config.OUTPUT_DIR, help="Output directory for MP3s")
     parser.add_argument("--langs", default=None, help="Comma-separated language codes (default: hu,de,es,fr)")

@@ -4,7 +4,6 @@ import io
 import os
 import sys
 import time
-import shutil
 import subprocess
 import argparse
 
@@ -12,31 +11,7 @@ from google import genai
 from google.genai import types
 
 from pipeline import config
-from pipeline.utils import parse_srt
-
-
-def find_ffmpeg() -> str:
-    """Find ffmpeg executable. Returns path or raises FileNotFoundError."""
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg:
-        return ffmpeg
-    explicit = [
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "bin", "ffmpeg.exe"),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "ffmpeg.exe"),
-        os.path.join(os.environ.get("ProgramFiles", ""), "ffmpeg", "bin", "ffmpeg.exe"),
-    ]
-    for p in explicit:
-        if os.path.isfile(p):
-            try:
-                result = subprocess.run([p, "-version"], capture_output=True)
-                if result.returncode == 0:
-                    return p
-            except (FileNotFoundError, OSError):
-                continue
-    raise FileNotFoundError(
-        "ffmpeg not found. Install with: winget install ffmpeg\n"
-        "Or download from: https://ffmpeg.org/download.html"
-    )
+from pipeline.utils import parse_srt, find_ffmpeg
 
 
 def _validate_voice(client: genai.Client, voice_name: str) -> bool:
@@ -151,7 +126,7 @@ def _pcm_to_mp3_bytes(pcm_data: bytes, ffmpeg_path: str, sample_rate: int = 2400
     return result.stdout
 
 
-def _build_tagged_text(entry_text: str, is_first: bool, entry_count: int) -> str:
+def _build_tagged_text(entry_text: str, is_first: bool) -> str:
     """
     Insert audio tags into narration text for expression control.
     - Opening entry: start with [enthusiasm]
@@ -176,7 +151,6 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
     sample_rate = config.SAMPLE_RATE
 
     segments = []
-    cumulative_time = 0.0
 
     print(f"  Generating {len(entries)} segments for {lang}...")
 
@@ -187,7 +161,7 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
         text = entry["text"]
         window_duration = end_s - start_s
 
-        tagged_text = _build_tagged_text(text, i == 0, len(entries))
+        tagged_text = _build_tagged_text(text, i == 0)
 
         print(f"    [{i + 1}/{len(entries)}] {idx}: {window_duration:.1f}s — {text[:60]}...")
 
@@ -237,7 +211,6 @@ def align_and_concat(segments, sample_rate):
         return b""
 
     concat_input = io.BytesIO()
-    cumulative_time = 0.0
     prev_end = None
     fade_time = 0.01
 
@@ -248,7 +221,6 @@ def align_and_concat(segments, sample_rate):
             gap = start_s - prev_end
             silence = _generate_silence(gap, sample_rate)
             concat_input.write(silence)
-            cumulative_time += gap
 
         if fade_time > 0 and len(pcm) > int(fade_time * sample_rate * config.CHANNELS * 2):
             fade_samples = int(fade_time * sample_rate * config.CHANNELS * 2)
@@ -262,7 +234,6 @@ def align_and_concat(segments, sample_rate):
             pcm = bytes(pcm_array)
 
         concat_input.write(pcm)
-        cumulative_time += duration
         prev_end = start_s + duration
 
     return concat_input.getvalue()

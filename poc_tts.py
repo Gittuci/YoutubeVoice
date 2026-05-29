@@ -13,7 +13,6 @@ Usage:
 """
 
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -24,7 +23,7 @@ load_dotenv()
 from google import genai
 from google.genai import types
 
-from pipeline.utils import pcm_to_mp3
+from pipeline.utils import pcm_to_mp3, find_ffmpeg
 
 
 def get_api_key() -> str:
@@ -36,30 +35,6 @@ def get_api_key() -> str:
     print("ERROR: Neither GOOGLE_API_KEY nor GEMINI_API_KEY environment variable is set.")
     print("Get a key at: https://aistudio.google.com/apikey")
     sys.exit(1)
-
-
-def find_ffmpeg() -> str:
-    """Find ffmpeg executable. Returns path or raises FileNotFoundError."""
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg:
-        return ffmpeg
-    explicit = [
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "bin", "ffmpeg.exe"),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "ffmpeg.exe"),
-        os.path.join(os.environ.get("ProgramFiles", ""), "ffmpeg", "bin", "ffmpeg.exe"),
-    ]
-    for p in explicit:
-        if os.path.isfile(p):
-            try:
-                result = subprocess.run([p, "-version"], capture_output=True)
-                if result.returncode == 0:
-                    return p
-            except (FileNotFoundError, OSError):
-                continue
-    raise FileNotFoundError(
-        "ffmpeg not found. Install with: winget install ffmpeg\n"
-        "Or download from: https://ffmpeg.org/download.html"
-    )
 
 
 def generate_tts(client: genai.Client, text: str, voice_name: str = "Despina", model: str = None) -> bytes:

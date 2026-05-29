@@ -1,10 +1,35 @@
-"""Shared utilities: WAV wrapping, MP3 conversion, SRT parsing."""
+"""Shared utilities: WAV wrapping, MP3 conversion, SRT parsing, ffmpeg detection."""
 
 import os
+import shutil
 import wave
 import subprocess
 import re
-from typing import List
+from typing import List, Union
+
+
+def find_ffmpeg() -> str:
+    """Find ffmpeg executable. Returns path or raises FileNotFoundError."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        return ffmpeg
+    explicit = [
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "bin", "ffmpeg.exe"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "ffmpeg.exe"),
+        os.path.join(os.environ.get("ProgramFiles", ""), "ffmpeg", "bin", "ffmpeg.exe"),
+    ]
+    for p in explicit:
+        if os.path.isfile(p):
+            try:
+                result = subprocess.run([p, "-version"], capture_output=True)
+                if result.returncode == 0:
+                    return p
+            except (FileNotFoundError, OSError):
+                continue
+    raise FileNotFoundError(
+        "ffmpeg not found. Install with: winget install ffmpeg\n"
+        "Or download from: https://ffmpeg.org/download.html"
+    )
 
 
 def pcm_to_wav(pcm_data: bytes, output_path: str, rate: int = 24000, channels: int = 1) -> str:
@@ -83,13 +108,16 @@ def seconds_to_ts(total_seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def parse_srt(path: str) -> List[dict]:
+def parse_srt(source: Union[str, bytes]) -> List[dict]:
     """
-    Parse an SRT file into a list of entries.
+    Parse an SRT file path or text content into a list of entries.
     Each entry: {index, start_seconds, end_seconds, text}
     """
-    with open(path, "r", encoding="utf-8") as f:
-        content = f.read()
+    if os.path.isfile(source):
+        with open(source, "r", encoding="utf-8") as f:
+            content = f.read()
+    else:
+        content = source
 
     entries = []
     for m in SRT_TS_RE.finditer(content):
@@ -121,3 +149,16 @@ def build_srt(entries: List[dict]) -> str:
         lines.append(e["text"])
         lines.append("")
     return "\n".join(lines)
+
+
+def strip_markdown_fences(text: str) -> str:
+    """Strip markdown fenced code blocks (```...```) from text."""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return text

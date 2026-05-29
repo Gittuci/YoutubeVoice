@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 
 from pipeline import config
-from pipeline.utils import parse_srt
+from pipeline.utils import parse_srt, strip_markdown_fences
 
 
 def download_video(url: str, output_path: str) -> str:
@@ -27,19 +27,6 @@ def download_video(url: str, output_path: str) -> str:
         info = ydl.extract_info(url, download=True)
         output_path = ydl.prepare_filename(info)
     return output_path
-
-
-def _clean_srt_response(text: str) -> str:
-    """Strip markdown fenced code blocks and leading/trailing whitespace."""
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        if lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
-    return text
 
 
 def analyze_video(video_path: str, client: genai.Client) -> str:
@@ -83,7 +70,7 @@ Output valid SRT format only. No commentary, no markdown. Just the SRT entries."
         raise RuntimeError("No candidates returned — response may be blocked or rate-limited")
 
     text = response.text or ""
-    text = _clean_srt_response(text)
+    text = strip_markdown_fences(text)
     return text
 
 
@@ -91,7 +78,7 @@ def _validate_srt(text: str, max_retries: int = 2) -> str:
     """Validate SRT text by parsing. Retry with stricter prompt on failure."""
     for attempt in range(max_retries + 1):
         try:
-            entries = parse_srt_from_text(text)
+            entries = parse_srt(text)
             if not entries:
                 raise ValueError("No SRT entries parsed")
             print(f"  Parsed {len(entries)} SRT entries")
@@ -113,19 +100,6 @@ def _refine_srt(text: str) -> str:
         if stripped and not stripped.startswith("#") and not stripped.startswith("`"):
             filtered.append(line)
     return "\n".join(filtered)
-
-
-def parse_srt_from_text(text: str):
-    """Parse SRT from raw text given that parse_srt reads from a file."""
-    import tempfile
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".srt", delete=False, encoding="utf-8") as f:
-        f.write(text)
-        tmp_path = f.name
-    try:
-        entries = parse_srt(tmp_path)
-    finally:
-        os.unlink(tmp_path)
-    return entries
 
 
 def main():

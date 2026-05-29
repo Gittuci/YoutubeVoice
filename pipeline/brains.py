@@ -10,7 +10,7 @@ from openai import OpenAI
 from google import genai
 
 from pipeline import config
-from pipeline.utils import parse_srt, SRT_TS_RE
+from pipeline.utils import parse_srt, SRT_TS_RE, strip_markdown_fences
 
 
 def load_master_srt(path: str) -> str:
@@ -21,14 +21,7 @@ def load_master_srt(path: str) -> str:
 
 def _clean_response(text: str) -> str:
     """Strip markdown wrapping, commentary, and extra whitespace from API response."""
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        if lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
+    text = strip_markdown_fences(text)
     while text and not text[0].isdigit():
         idx = text.find("\n")
         if idx == -1:
@@ -76,7 +69,7 @@ def validate_translation(master_srt: str, translated_srt: str, lang: str) -> boo
             return False
 
     try:
-        entries = parse_srt_from_text(translated_srt)
+        entries = parse_srt(translated_srt)
         if len(entries) != len(master_entries):
             print(f"  [{lang}] Validation failed: parse entry count mismatch")
             return False
@@ -85,19 +78,6 @@ def validate_translation(master_srt: str, translated_srt: str, lang: str) -> boo
         return False
 
     return True
-
-
-def parse_srt_from_text(text: str):
-    """Parse SRT from raw text."""
-    import tempfile
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".srt", delete=False, encoding="utf-8") as f:
-        f.write(text)
-        tmp_path = f.name
-    try:
-        entries = parse_srt(tmp_path)
-    finally:
-        os.unlink(tmp_path)
-    return entries
 
 
 def translate_with_deepseek(master_srt: str, lang: str, client: OpenAI) -> str:

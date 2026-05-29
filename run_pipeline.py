@@ -11,8 +11,10 @@ from openai import OpenAI
 from pipeline import config
 
 
-def run_phase2(url: str, output_dir: str, temp_dir: str, verbose: bool = False):
-    """Phase 2: Download YouTube video + analyze → master_hu.srt"""
+def run_phase2(url: str, output_dir: str, temp_dir: str, keep_video: bool = False, verbose: bool = False):
+    """Phase 2: Download YouTube video + analyze → master_hu.srt
+    Returns (srt_path, video_path) — video_path is None if cleanup was performed.
+    """
     from pipeline.eyes import download_video, analyze_video, _validate_srt
 
     if not config.google_api_key:
@@ -32,18 +34,22 @@ def run_phase2(url: str, output_dir: str, temp_dir: str, verbose: bool = False):
     actual_path = download_video(url, temp_video_path)
     print(f"    Downloaded: {actual_path}")
 
+    srt_output = os.path.join(output_dir, "master_hu.srt")
     try:
         srt_text = analyze_video(actual_path, client)
         srt_text = _validate_srt(srt_text)
-        output_path = os.path.join(output_dir, "master_hu.srt")
-        with open(output_path, "w", encoding="utf-8") as f:
+        with open(srt_output, "w", encoding="utf-8") as f:
             f.write(srt_text)
-        print(f"\n    SRT saved: {output_path}")
+        print(f"\n    SRT saved: {srt_output}")
     finally:
-        if os.path.isfile(actual_path):
-            os.unlink(actual_path)
+        if keep_video:
+            print(f"    Video preserved at: {actual_path}")
+        else:
+            if os.path.isfile(actual_path):
+                os.unlink(actual_path)
 
-    return os.path.join(output_dir, "master_hu.srt")
+    video_kept = actual_path if keep_video else None
+    return srt_output, video_kept
 
 
 def run_phase3(input_dir: str, output_dir: str, verbose: bool = False):
@@ -90,7 +96,8 @@ def run_phase3(input_dir: str, output_dir: str, verbose: bool = False):
 def run_phase4(input_dir: str, output_dir: str, verbose: bool = False):
     """Phase 4: Generate TTS voiceover MP3s from SRTs"""
     import time
-    from pipeline.voice import find_ffmpeg, generate_voiceover
+    from pipeline.utils import find_ffmpeg
+    from pipeline.voice import generate_voiceover
 
     if not config.google_api_key:
         raise RuntimeError("GOOGLE_API_KEY not set")
@@ -114,8 +121,11 @@ def run_phase4(input_dir: str, output_dir: str, verbose: bool = False):
             continue
 
         print(f"\n  Processing {lang}...")
-        generate_voiceover(srt_path, lang, client, ffmpeg_path, mp3_path)
-        outputs.append(mp3_path)
+        try:
+            generate_voiceover(srt_path, lang, client, ffmpeg_path, mp3_path)
+            outputs.append(mp3_path)
+        except Exception as e:
+            print(f"  ERROR [{lang}]: {e}")
         time.sleep(1)
 
     return outputs
@@ -123,7 +133,8 @@ def run_phase4(input_dir: str, output_dir: str, verbose: bool = False):
 
 def run_phase5(input_dir: str, output_dir: str, video_path: str = None, verbose: bool = False):
     """Phase 5: Verify alignment, optionally mux with video"""
-    from pipeline.assembly import find_ffmpeg, verify_alignment, mux_video_audio
+    from pipeline.utils import find_ffmpeg
+    from pipeline.assembly import verify_alignment, mux_video_audio
 
     ffmpeg_path = find_ffmpeg()
 
@@ -180,16 +191,19 @@ def main():
     os.makedirs(args.output, exist_ok=True)
     os.makedirs(config.TEMP_DIR, exist_ok=True)
 
-    temp_video_path = os.path.join(config.TEMP_DIR, "video.mp4")
+    kept_video_path = None
 
     if "2" not in skip:
         try:
-            run_phase2(args.url, args.output, config.TEMP_DIR, args.verbose)
+            _, kept_video_path = run_phase2(args.url, args.output, config.TEMP_DIR,
+                                            keep_video=args.with_video, verbose=args.verbose)
         except Exception as e:
             print(f"\n  Phase 2 FAILED: {e}")
             sys.exit(1)
     else:
         print("\n  Skipping Phase 2")
+        if args.with_video:
+            kept_video_path = os.path.join(config.TEMP_DIR, "video.mp4")
 
     if "3" not in skip:
         try:
@@ -211,8 +225,7 @@ def main():
 
     if "5" not in skip:
         try:
-            video_arg = temp_video_path if args.with_video else None
-            results = run_phase5(args.output, args.output, video_arg, args.verbose)
+            results = run_phase5(args.output, args.output, kept_video_path, args.verbose)
         except Exception as e:
             print(f"\n  Phase 5 FAILED: {e}")
             sys.exit(1)

@@ -1,38 +1,12 @@
 """Phase 5 — Assembly: Verify and optionally mux voiceover MP3s with video."""
 
 import os
-import sys
 import shutil
 import subprocess
 import argparse
-import struct
 
 from pipeline import config
-from pipeline.utils import parse_srt
-
-
-def find_ffmpeg() -> str:
-    """Find ffmpeg executable. Returns path or raises FileNotFoundError."""
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg:
-        return ffmpeg
-    explicit = [
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "bin", "ffmpeg.exe"),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "ffmpeg", "ffmpeg.exe"),
-        os.path.join(os.environ.get("ProgramFiles", ""), "ffmpeg", "bin", "ffmpeg.exe"),
-    ]
-    for p in explicit:
-        if os.path.isfile(p):
-            try:
-                result = subprocess.run([p, "-version"], capture_output=True)
-                if result.returncode == 0:
-                    return p
-            except (FileNotFoundError, OSError):
-                continue
-    raise FileNotFoundError(
-        "ffmpeg not found. Install with: winget install ffmpeg\n"
-        "Or download from: https://ffmpeg.org/download.html"
-    )
+from pipeline.utils import parse_srt, find_ffmpeg
 
 
 def get_mp3_duration(mp3_path: str, ffmpeg_path: str) -> float:

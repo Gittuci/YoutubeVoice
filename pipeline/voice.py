@@ -11,7 +11,7 @@ from google import genai
 from google.genai import types
 
 from pipeline import config
-from pipeline.utils import parse_srt, find_ffmpeg
+from pipeline.utils import parse_srt, find_ffmpeg, safe_print
 
 
 def _validate_voice(client: genai.Client, voice_name: str) -> bool:
@@ -43,11 +43,11 @@ def _get_voice_for_lang(client: genai.Client, lang: str) -> str:
     """Get a working voice for a language, falling back on failure."""
     primary, fallback = config.VOICE_MAP.get(lang, ("Despina", "Aoede"))
     if _validate_voice(client, primary):
-        print(f"  Voice '{primary}' validated for {lang}")
+        safe_print(f"  Voice '{primary}' validated for {lang}")
         return primary
-    print(f"  Voice '{primary}' failed validation for {lang}, trying '{fallback}'...")
+    safe_print(f"  Voice '{primary}' failed validation for {lang}, trying '{fallback}'...")
     if _validate_voice(client, fallback):
-        print(f"  Voice '{fallback}' validated for {lang}")
+        safe_print(f"  Voice '{fallback}' validated for {lang}")
         return fallback
 
     candidates = ["Despina", "Aoede", "Kore", "Charon"]
@@ -55,7 +55,7 @@ def _get_voice_for_lang(client: genai.Client, lang: str) -> str:
         if v == primary or v == fallback:
             continue
         if _validate_voice(client, v):
-            print(f"  Voice '{v}' validated as fallback for {lang}")
+            safe_print(f"  Voice '{v}' validated as fallback for {lang}")
             return v
 
     raise RuntimeError(f"No working TTS voice found for {lang}")
@@ -91,6 +91,23 @@ def generate_tts(client: genai.Client, text: str, voice_name: str, director_note
         raise RuntimeError("No audio data in response")
 
     return part.inline_data.data
+
+
+def _generate_tts_with_retry(client, text, voice_name, director_notes, max_retries=3):
+    """Generate TTS with retry on rate limit (429) errors."""
+    import time as _time
+    for attempt in range(max_retries):
+        try:
+            return generate_tts(client, text, voice_name, director_notes)
+        except Exception as e:
+            err = str(e)
+            if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                wait = (attempt + 1) * 30
+                safe_print(f"      Rate limited, waiting {wait}s before retry {attempt + 1}/{max_retries}...")
+                _time.sleep(wait)
+            else:
+                raise
+    raise RuntimeError(f"TTS failed after {max_retries} retries")
 
 
 def _pcm_duration(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1) -> float:
@@ -152,7 +169,7 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
 
     segments = []
 
-    print(f"  Generating {len(entries)} segments for {lang}...")
+    safe_print(f"  Generating {len(entries)} segments for {lang}...")
 
     for i, entry in enumerate(entries):
         idx = entry["index"]
@@ -163,16 +180,16 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
 
         tagged_text = _build_tagged_text(text, i == 0)
 
-        print(f"    [{i + 1}/{len(entries)}] {idx}: {window_duration:.1f}s — {text[:60]}...")
+        safe_print(f"    [{i + 1}/{len(entries)}] {idx}: {window_duration:.1f}s — {text[:60]}...")
 
         try:
-            pcm = generate_tts(client, tagged_text, voice, director_notes)
+            pcm = _generate_tts_with_retry(client, tagged_text, voice, director_notes)
         except Exception as e:
-            print(f"      TTS failed: {e}")
+            safe_print(f"      TTS failed: {e}")
             raise
 
         actual_duration = _pcm_duration(pcm, sample_rate)
-        print(f"      Audio: {actual_duration:.2f}s (window: {window_duration:.2f}s)")
+        safe_print(f"      Audio: {actual_duration:.2f}s (window: {window_duration:.2f}s)")
 
         if actual_duration > window_duration:
             target_samples = int(window_duration * sample_rate * config.CHANNELS * 2)
@@ -182,15 +199,15 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
             segment_duration = actual_duration
 
         segments.append((pcm, segment_duration, entry))
-        time.sleep(1)
+        time.sleep(6)  # 10 req/min limit
 
     if not segments:
         raise RuntimeError("No audio segments generated")
 
-    print(f"\n  Concatenating {len(segments)} segments with time alignment...")
+    safe_print(f"\n  Concatenating {len(segments)} segments with time alignment...")
     aligned_pcm = align_and_concat(segments, sample_rate)
 
-    print(f"  Converting to MP3...")
+    safe_print(f"  Converting to MP3...")
     mp3_bytes = _pcm_to_mp3_bytes(aligned_pcm, ffmpeg_path, sample_rate)
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -198,7 +215,7 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
         f.write(mp3_bytes)
 
     total_duration = _pcm_duration(aligned_pcm, sample_rate)
-    print(f"  Voiceover saved: {output_path} ({total_duration:.1f}s)")
+    safe_print(f"  Voiceover saved: {output_path} ({total_duration:.1f}s)")
     return output_path
 
 
@@ -247,7 +264,7 @@ def main():
     args = parser.parse_args()
 
     if not config.google_api_key:
-        print("ERROR: GOOGLE_API_KEY not set. Check your .env file.")
+        safe_print("ERROR: GOOGLE_API_KEY not set. Check your .env file.")
         sys.exit(1)
 
     langs = args.langs.split(",") if args.langs else ["hu"] + config.TARGET_LANGS
@@ -257,29 +274,29 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    print("=" * 60)
-    print("  Phase 4: TTS Voiceover Generation")
-    print(f"  Languages: {', '.join(langs)}")
-    print("=" * 60)
+    safe_print("=" * 60)
+    safe_print("  Phase 4: TTS Voiceover Generation")
+    safe_print(f"  Languages: {', '.join(langs)}")
+    safe_print("=" * 60)
 
     for lang in langs:
         srt_path = os.path.join(args.input_dir, f"master_{lang}.srt")
         mp3_path = os.path.join(args.output_dir, f"voiceover_{lang}.mp3")
 
         if not os.path.isfile(srt_path):
-            print(f"\n  SKIP: {srt_path} not found")
+            safe_print(f"\n  SKIP: {srt_path} not found")
             continue
 
-        print(f"\n  Processing {lang}...")
+        safe_print(f"\n  Processing {lang}...")
         try:
             generate_voiceover(srt_path, lang, client, ffmpeg_path, mp3_path)
         except Exception as e:
-            print(f"  ERROR [{lang}]: {e}")
+            safe_print(f"  ERROR [{lang}]: {e}")
             continue
 
-    print(f"\n{'=' * 60}")
-    print(f"  Phase 4 complete")
-    print(f"{'=' * 60}")
+    safe_print(f"\n{'=' * 60}")
+    safe_print(f"  Phase 4 complete")
+    safe_print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

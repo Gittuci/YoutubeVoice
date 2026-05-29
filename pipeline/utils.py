@@ -162,3 +162,18 @@ def strip_markdown_fences(text: str) -> str:
             lines = lines[:-1]
         text = "\n".join(lines).strip()
     return text
+
+
+def safe_print(*args, **kwargs):
+    """Print to stdout, replacing unencodable characters to avoid cp1252 crashes on Windows."""
+    import sys
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        safe_args = []
+        for a in args:
+            if isinstance(a, str):
+                safe_args.append(a.encode(sys.stdout.encoding or 'cp1252', errors='replace').decode(sys.stdout.encoding or 'cp1252'))
+            else:
+                safe_args.append(a)
+        print(*safe_args, **kwargs)

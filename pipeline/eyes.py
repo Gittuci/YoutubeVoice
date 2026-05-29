@@ -1,9 +1,10 @@
-"""Phase 2 — Video Analysis: YouTube video → SRT via Gemini vision."""
+"""Phase 2 -- Video Analysis: YouTube video -> SRT via Gemini vision."""
 
 import os
 import sys
 import time
 import argparse
+import re
 import yt_dlp
 
 from google import genai
@@ -34,7 +35,7 @@ def analyze_video(video_path: str, client: genai.Client) -> str:
     print(f"  Uploading {os.path.basename(video_path)} to Gemini File API...")
     video_file = client.files.upload(
         file=video_path,
-        config=types.FileConfig(display_name="youtube_video"),
+        config=types.UploadFileConfig(display_name="youtube_video"),
     )
 
     print("  Waiting for video processing...")
@@ -48,7 +49,7 @@ def analyze_video(video_path: str, client: genai.Client) -> str:
     print(f"  Video ready (state={video_file.state})")
 
     prompt = """You are watching a mute patchwork/quilt instructional video using EZ-Log and EZpiecer templates.
-Only hands and templates are visible — no face, no lip movement.
+Only hands and templates are visible -- no face, no lip movement.
 
 Analyze this video carefully and describe each distinct visual step shown on screen,
 including what the hands are doing at each moment.
@@ -56,7 +57,7 @@ including what the hands are doing at each moment.
 For each step, output an SRT entry with:
   - The exact timestamp range (HH:MM:SS,mmm --> HH:MM:SS,mmm) when that action is visible.
   - Instructional, friendly Hungarian narration text explaining the step for the viewer.
-  - Each entry must fit within its timestamp — keep text concise enough to be spoken naturally.
+  - Each entry must fit within its timestamp -- keep text concise enough to be spoken naturally.
 
 Output valid SRT format only. No commentary, no markdown. Just the SRT entries."""
 
@@ -67,39 +68,60 @@ Output valid SRT format only. No commentary, no markdown. Just the SRT entries."
     )
 
     if not response.candidates:
-        raise RuntimeError("No candidates returned — response may be blocked or rate-limited")
+        raise RuntimeError("No candidates returned -- response may be blocked or rate-limited")
 
     text = response.text or ""
-    text = strip_markdown_fences(text)
     return text
 
 
 def _validate_srt(text: str, max_retries: int = 2) -> str:
-    """Validate SRT text by parsing. Retry with stricter prompt on failure."""
+    """Validate SRT text by parsing. Applies repair/refine before each attempt."""
+    raw = text
     for attempt in range(max_retries + 1):
+        cleaned = strip_markdown_fences(text)
+        cleaned = _repair_srt_timestamps(cleaned)
+        cleaned = _refine_srt(cleaned)
         try:
-            entries = parse_srt(text)
+            entries = parse_srt(cleaned)
             if not entries:
                 raise ValueError("No SRT entries parsed")
             print(f"  Parsed {len(entries)} SRT entries")
-            return text
+            return cleaned
         except Exception as e:
+            if attempt == 0:
+                print(f"  --- RAW response preview ({len(raw)} chars) ---")
+                print(raw[:500])
+                print(f"  --- END RAW PREVIEW ---")
             if attempt < max_retries:
                 print(f"  SRT parse attempt {attempt + 1} failed: {e}. Retrying...")
-                text = _refine_srt(text)
             else:
+                print(f"  --- DEBUG: Cleaned text ({len(cleaned)} chars) ---")
+                print(cleaned[:1000])
+                print(f"  --- END DEBUG ---")
                 raise RuntimeError(f"SRT validation failed after {max_retries} retries: {e}")
 
 
 def _refine_srt(text: str) -> str:
-    """Strip non-SRT content more aggressively."""
+    """Strip non-SRT content more aggressively. Preserves blank lines (SRT separators)."""
     lines = text.split("\n")
     filtered = []
     for line in lines:
         stripped = line.strip()
-        if stripped and not stripped.startswith("#") and not stripped.startswith("`"):
+        if not stripped or (not stripped.startswith("#") and not stripped.startswith("`")):
             filtered.append(line)
     return "\n".join(filtered)
+
+
+def _repair_srt_timestamps(text: str) -> str:
+    """Fix common Gemini timestamp formatting errors (e.g., 0000:41,500 -> 00:00:41,500)."""
+    # Fix missing colon in hour part: 0000:41,500 -> 00:00:41,500
+    text = re.sub(
+        r'^(\d{4}):(\d{2}),(\d{3})',
+        r'00:\2,\3',
+        text,
+        flags=re.MULTILINE,
+    )
+    return text
 
 
 def main():
@@ -118,7 +140,7 @@ def main():
     client = genai.Client(api_key=config.google_api_key)
 
     print("=" * 60)
-    print("  Phase 2: Video → SRT Analysis")
+    print("  Phase 2: Video -> SRT Analysis")
     print(f"  URL: {args.url}")
     print("=" * 60)
 

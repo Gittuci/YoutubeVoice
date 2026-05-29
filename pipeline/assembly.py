@@ -10,35 +10,39 @@ from pipeline.utils import parse_srt, find_ffmpeg
 
 
 def get_mp3_duration(mp3_path: str, ffmpeg_path: str) -> float:
-    """Get duration of an MP3 file in seconds using ffprobe or ffmpeg."""
-    ffprobe = ffmpeg_path.replace("ffmpeg.exe", "ffprobe.exe").replace("ffmpeg", "ffprobe")
+    """Get duration of an MP3 file in seconds using ffprobe or ffmpeg fallback."""
+    # Try ffprobe from same directory as ffmpeg
+    ffmpeg_dir = os.path.dirname(ffmpeg_path)
+    ffprobe = os.path.join(ffmpeg_dir, "ffprobe.exe" if ffmpeg_path.endswith(".exe") else "ffprobe")
     if not os.path.isfile(ffprobe):
-        ffprobe = shutil.which("ffprobe") or ffmpeg_path
+        ffprobe = shutil.which("ffprobe")
 
-    cmd = [
-        ffprobe, "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        mp3_path,
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"ffprobe failed: {result.stderr}")
-
-    try:
-        return float(result.stdout.strip())
-    except ValueError:
-        cmd2 = [
-            ffmpeg_path, "-i", mp3_path,
-            "-f", "null", "-",
+    if ffprobe and os.path.isfile(ffprobe):
+        cmd = [
+            ffprobe, "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            mp3_path,
         ]
-        result2 = subprocess.run(cmd2, capture_output=True, text=True)
-        for line in result2.stderr.split("\n"):
-            if "Duration:" in line:
-                parts = line.strip().split("Duration: ")[1].split(",")[0].split(":")
-                h, m, s = int(parts[0]), int(parts[1]), float(parts[2])
-                return h * 3600 + m * 60 + s
-        raise RuntimeError("Could not determine MP3 duration")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            try:
+                return float(result.stdout.strip())
+            except ValueError:
+                pass
+
+    # Fallback: parse duration from ffmpeg stderr
+    cmd2 = [
+        ffmpeg_path, "-i", mp3_path,
+        "-f", "null", "-",
+    ]
+    result2 = subprocess.run(cmd2, capture_output=True, text=True)
+    for line in result2.stderr.split("\n"):
+        if "Duration:" in line:
+            parts = line.strip().split("Duration: ")[1].split(",")[0].split(":")
+            h, m, s = int(parts[0]), int(parts[1]), float(parts[2])
+            return h * 3600 + m * 60 + s
+    raise RuntimeError("Could not determine MP3 duration")
 
 
 def verify_alignment(mp3_path: str, srt_path: str, lang: str, ffmpeg_path: str) -> bool:

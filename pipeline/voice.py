@@ -143,6 +143,27 @@ def _pcm_to_mp3_bytes(pcm_data: bytes, ffmpeg_path: str, sample_rate: int = 2400
     return result.stdout
 
 
+def _time_stretch_pcm(pcm_data: bytes, speed: float, sample_rate: int, ffmpeg_path: str) -> bytes:
+    """Speed up PCM audio using ffmpeg atempo filter. 1.0=normal, >1.0=faster/shorter."""
+    cmd = [
+        ffmpeg_path, "-y",
+        "-f", "s16le",
+        "-ar", str(sample_rate),
+        "-ac", "1",
+        "-i", "pipe:0",
+        "-af", f"atempo={speed:.4f}",
+        "-f", "s16le",
+        "-ar", str(sample_rate),
+        "-ac", "1",
+        "-loglevel", "error",
+        "pipe:1",
+    ]
+    result = subprocess.run(cmd, capture_output=True, input=pcm_data)
+    if result.returncode != 0:
+        raise RuntimeError(f"atempo time-stretch failed: {result.stderr}")
+    return result.stdout
+
+
 def _build_tagged_text(entry_text: str, is_first: bool) -> str:
     """
     Insert audio tags into narration text for expression control.
@@ -192,10 +213,18 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
         safe_print(f"      Audio: {actual_duration:.2f}s (window: {window_duration:.2f}s)")
 
         if actual_duration > window_duration:
-            target_bytes = int(window_duration * sample_rate * config.CHANNELS * 2)
-            target_bytes -= target_bytes % 2  # force even (16-bit sample boundary)
-            pcm = pcm[:target_bytes]
-            segment_duration = window_duration
+            speed = actual_duration / window_duration
+            if speed <= 1.5:  # safe range for atempo (0.5-2.0)
+                safe_print(f"      Time-stretching: {speed:.2f}x to fit window")
+                pcm = _time_stretch_pcm(pcm, speed, sample_rate, ffmpeg_path)
+                segment_duration = window_duration
+            else:
+                # Too much stretch needed, fall back to truncation
+                safe_print(f"      Speed {speed:.2f}x too high, truncating instead")
+                target_bytes = int(window_duration * sample_rate * config.CHANNELS * 2)
+                target_bytes -= target_bytes % 2
+                pcm = pcm[:target_bytes]
+                segment_duration = window_duration
         else:
             segment_duration = actual_duration
 

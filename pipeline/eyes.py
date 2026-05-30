@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 
 from pipeline import config
-from pipeline.utils import parse_srt, strip_markdown_fences
+from pipeline.utils import parse_srt, strip_markdown_fences, insert_srt_indices
 
 
 def download_video(url: str, output_path: str) -> str:
@@ -37,18 +37,7 @@ def analyze_video(video_path: str, client: genai.Client) -> str:
 
     video_part = types.Part.from_bytes(data=video_bytes, mime_type="video/mp4")
 
-    prompt = """You are watching a mute patchwork/quilt instructional video using EZ-Log and EZpiecer templates.
-Only hands and templates are visible -- no face, no lip movement.
-
-Analyze this video carefully and describe each distinct visual step shown on screen,
-including what the hands are doing at each moment.
-
-For each step, output an SRT entry with:
-  - The exact timestamp range (HH:MM:SS,mmm --> HH:MM:SS,mmm) when that action is visible.
-  - Instructional, friendly Hungarian narration text explaining the step for the viewer.
-  - Each entry must fit within its timestamp -- keep text concise enough to be spoken naturally.
-
-Output valid SRT format only. No commentary, no markdown. Just the SRT entries."""
+    prompt = config.load_prompt("video_analysis.txt")
 
     print("  Sending analysis prompt to Gemini...")
     response = client.models.generate_content(
@@ -69,6 +58,7 @@ def _validate_srt(text: str, max_retries: int = 2) -> str:
     for attempt in range(max_retries + 1):
         cleaned = strip_markdown_fences(text)
         cleaned = _repair_srt_timestamps(cleaned)
+        cleaned = insert_srt_indices(cleaned)
         cleaned = _refine_srt(cleaned)
         try:
             entries = parse_srt(cleaned)
@@ -102,12 +92,34 @@ def _refine_srt(text: str) -> str:
 
 
 def _repair_srt_timestamps(text: str) -> str:
-    """Fix common Gemini timestamp formatting errors (e.g., 0000:41,500 -> 00:00:41,500)."""
+    """Fix common Gemini timestamp formatting errors."""
+    # Fix: MM:SS,mmm → 00:MM:SS,mmm (missing hours — Gemini sometimes outputs short format)
+    # Only apply if the text does NOT already contain proper HH:MM:SS,mmm timestamps.
+    if not re.search(r'\d{2}:\d{2}:\d{2},\d{3}', text):
+        text = re.sub(
+            r'^(\d{1,2}):(\d{2}),(\d{3})',
+            r'00:\1:\2,\3',
+            text,
+            flags=re.MULTILINE,
+        )
+        text = re.sub(
+            r'-->\s*(\d{1,2}):(\d{2}),(\d{3})',
+            r'--> 00:\1:\2,\3',
+            text,
+        )
+    # Fix: 0000:SS,mmm → 00:00:SS,mmm
     text = re.sub(
         r'^(\d{4}):(\d{2}),(\d{3})',
         r'00:\2,\3',
         text,
         flags=re.MULTILINE,
+    )
+    # Fix: HH:MM:SSS (no comma) → HH:MM:00,SSS
+    # e.g., 01:00:500 → 01:00:00,500
+    text = re.sub(
+        r'(\d{2}:\d{2}:)(\d{3})(?=\n|\s|-->|$)',
+        r'\100,\2',
+        text,
     )
     return text
 

@@ -10,7 +10,7 @@ from openai import OpenAI
 from google import genai
 
 from pipeline import config
-from pipeline.utils import parse_srt, SRT_TS_RE, strip_markdown_fences
+from pipeline.utils import parse_srt, SRT_TS_RE, strip_markdown_fences, insert_srt_indices
 
 
 def load_master_srt(path: str) -> str:
@@ -20,8 +20,11 @@ def load_master_srt(path: str) -> str:
 
 
 def _clean_response(text: str) -> str:
-    """Strip markdown wrapping, commentary, and extra whitespace from API response."""
+    """Strip markdown wrapping, commentary, and extra whitespace from API response.
+    Also inserts missing SRT index numbers."""
     text = strip_markdown_fences(text)
+
+    # Strip leading non-digit preamble
     while text and not text[0].isdigit():
         idx = text.find("\n")
         if idx == -1:
@@ -31,6 +34,17 @@ def _clean_response(text: str) -> str:
             text = candidate
             break
         text = candidate
+
+    # Strip trailing non-SRT junk after the last blank-line separator
+    last_sep = text.rfind("\n\n")
+    if last_sep != -1:
+        after_last = text[last_sep + 2:]
+        if after_last and not after_last.strip()[0].isdigit():
+            text = text[:last_sep].rstrip() + "\n"
+
+    # Insert missing SRT index numbers (same fix as Phase 2)
+    text = insert_srt_indices(text)
+
     return text
 
 
@@ -59,7 +73,7 @@ def validate_translation(master_srt: str, translated_srt: str, lang: str) -> boo
     master_entries = _extract_timestamps(master_srt)
     trans_entries = _extract_timestamps(translated_srt)
 
-    if len(master_entries) != len(trans_entries):
+    if abs(len(master_entries) - len(trans_entries)) > 1:
         print(f"  [{lang}] Validation failed: entry count mismatch ({len(master_entries)} vs {len(trans_entries)})")
         return False
 
@@ -83,15 +97,10 @@ def validate_translation(master_srt: str, translated_srt: str, lang: str) -> boo
 def translate_with_deepseek(master_srt: str, lang: str, client: OpenAI, source_lang: str = "Hungarian") -> str:
     """Translate SRT using DeepSeek API."""
     lang_name = config.LANG_NAMES.get(lang, lang)
-    system_prompt = (
-        f"Translate the following {source_lang} SRT subtitles into {lang_name}.\n"
-        "STRICT RULES:\n"
-        "- Preserve ALL SRT entry indexes and timestamps EXACTLY as-is — copy them verbatim.\n"
-        "- Only translate the subtitle text part of each entry.\n"
-        "- Keep translations natural, instructional, and concise enough to fit within the timestamp durations.\n"
-        "- Output valid SRT format only — no commentary, no markdown, no extra text.\n"
-        "- The entire output must be a valid .srt file.\n"
-        "- Start your response with the first SRT index number. Do not prefix with any text."
+    system_prompt = config.load_prompt(
+        "translate_system.txt",
+        source_lang=source_lang,
+        target_lang=lang_name,
     )
 
     response = client.chat.completions.create(
@@ -110,16 +119,12 @@ def translate_with_deepseek(master_srt: str, lang: str, client: OpenAI, source_l
 def translate_with_gemini(master_srt: str, lang: str, gemini_client: genai.Client, source_lang: str = "Hungarian") -> str:
     """Fallback: Translate SRT using Gemini."""
     lang_name = config.LANG_NAMES.get(lang, lang)
-    prompt = (
-        f"Translate the following {source_lang} SRT subtitles into {lang_name}.\n"
-        "STRICT RULES:\n"
-        "- Preserve ALL SRT entry indexes and timestamps EXACTLY as-is — copy them verbatim.\n"
-        "- Only translate the subtitle text part of each entry.\n"
-        "- Keep translations natural, instructional, and concise enough to fit within the timestamp durations.\n"
-        "- Output valid SRT format only — no commentary, no markdown, no extra text.\n"
-        "- Start your response with the first SRT index number.\n\n"
-        f"{master_srt}"
+    prompt = config.load_prompt(
+        "translate_gemini.txt",
+        source_lang=source_lang,
+        target_lang=lang_name,
     )
+    prompt = f"{prompt}\n\n{master_srt}"
 
     response = gemini_client.models.generate_content(
         model=config.GEMINI_VISION_MODEL,

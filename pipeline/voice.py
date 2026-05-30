@@ -62,10 +62,7 @@ def _get_voice_for_lang(client: genai.Client, lang: str) -> str:
 
 def generate_tts(client: genai.Client, text: str, voice_name: str, director_notes: str) -> bytes:
     """Generate speech from text using Gemini TTS. Returns raw L16 PCM bytes."""
-    prompt = (
-        f"### DIRECTOR'S NOTES\n{director_notes}\n\n"
-        f"#### TRANSCRIPT\n{text}"
-    )
+    prompt = config.load_prompt("tts_generation.txt", director_notes=director_notes, text=text)
 
     response = client.models.generate_content(
         model=config.GEMINI_TTS_MODEL,
@@ -113,15 +110,41 @@ def _pcm_duration(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1) 
     return len(pcm_data) / (sample_rate * channels * 2)
 
 
+def _trim_leading_silence(pcm_data: bytes, threshold: int = 100) -> bytes:
+    """Trim leading silence from 16-bit PCM data.
+    Prevents ~15 frame (~0.5s) delay caused by TTS startup silence."""
+    import struct
+    for offset in range(0, len(pcm_data) - 1, 2):
+        val = abs(struct.unpack_from("<h", pcm_data, offset)[0])
+        if val > threshold:
+            return pcm_data[offset:]
+    return pcm_data
+
+
+def _chain_atempo(speed: float) -> str:
+    """Build ffmpeg atempo filter string, chaining filters for speeds outside 0.5-2.0."""
+    if 0.5 <= speed <= 2.0:
+        return f"atempo={speed:.4f}"
+    remaining = speed
+    filters = []
+    while remaining > 2.0:
+        filters.append("atempo=2.0")
+        remaining /= 2.0
+    if abs(remaining - 1.0) > 0.001:
+        filters.append(f"atempo={remaining:.4f}")
+    return ",".join(filters)
+
+
 def _time_stretch_pcm(pcm_data: bytes, speed: float, sample_rate: int, ffmpeg_path: str) -> bytes:
-    """Speed up PCM audio using ffmpeg atempo filter. 1.0=normal, >1.0=faster/shorter."""
+    """Speed up/down PCM audio using ffmpeg atempo filter(s). 1.0=normal, >1.0=faster."""
+    atempo_filter = _chain_atempo(speed)
     cmd = [
         ffmpeg_path, "-y",
         "-f", "s16le",
         "-ar", str(sample_rate),
         "-ac", "1",
         "-i", "pipe:0",
-        "-af", f"atempo={speed:.4f}",
+        "-af", atempo_filter,
         "-f", "s16le",
         "-ar", str(sample_rate),
         "-ac", "1",
@@ -141,22 +164,24 @@ def _build_tagged_text(entry_text: str, is_first: bool) -> str:
     - Normal entries: no leading tag
     - Important tips: add [warm] before tip
     """
+    tag = config.load_prompt("expression_tags.txt")
     tagged = entry_text
     if is_first:
-        tagged = f"[enthusiasm] {tagged}"
+        tagged = f"{tag} {tagged}"
     return tagged
 
 
 def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_path: str,
                        wav_dir: str) -> list:
-    """Generate time-stretched WAV segments from an SRT file for a given language.
-    Returns list of (wav_path, start_seconds, duration) tuples.
+    """Generate per-segment time-stretched WAV files from an SRT file.
+    Each segment is stretched to exactly fill its SRT window — no gaps, no overlap.
+    Returns list of (wav_path, start_seconds, window_duration) tuples.
     """
     entries = parse_srt(srt_path)
     if not entries:
         raise ValueError(f"No entries found in {srt_path}")
 
-    director_notes = config.DIRECTOR_NOTES.get(lang, config.DIRECTOR_NOTES_HU)
+    director_notes = config.DIRECTOR_NOTES.get(lang, config.DIRECTOR_NOTES["hu"])
     voice = _get_voice_for_lang(client, lang)
     sample_rate = config.SAMPLE_RATE
 
@@ -173,39 +198,44 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
         text = entry["text"]
         window_duration = end_s - start_s
 
-        tagged_text = _build_tagged_text(text, i == 0)
+        wav_filename = f"{lang}_seg_{i:04d}.wav"
+        wav_path = os.path.join(wav_dir, wav_filename)
 
+        # Skip if WAV exists and is newer than SRT
+        if os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0:
+            if os.path.getmtime(wav_path) >= os.path.getmtime(srt_path):
+                import wave
+                with wave.open(wav_path, "rb") as wf:
+                    actual_duration = wf.getnframes() / wf.getframerate()
+                safe_print(f"    [{i + 1}/{len(entries)}] {idx}: {actual_duration:.1f}s — SKIP (exists)")
+                segments.append((wav_path, start_s, actual_duration))
+                continue
+            else:
+                safe_print(f"    [{i + 1}/{len(entries)}] {idx}: {window_duration:.1f}s — REGENERATE (SRT changed)")
+
+        tagged_text = _build_tagged_text(text, i == 0)
         safe_print(f"    [{i + 1}/{len(entries)}] {idx}: {window_duration:.1f}s — {text[:60]}...")
 
         try:
             pcm = _generate_tts_with_retry(client, tagged_text, voice, director_notes)
+            pcm = _trim_leading_silence(pcm)
         except Exception as e:
             safe_print(f"      TTS failed: {e}")
             raise
 
         actual_duration = _pcm_duration(pcm, sample_rate)
-        safe_print(f"      Audio: {actual_duration:.2f}s (window: {window_duration:.2f}s)")
+        safe_print(f"      Raw: {actual_duration:.2f}s (window: {window_duration:.2f}s)")
 
-        if actual_duration > window_duration:
+        # Only speed up to fit the window; never slow down
+        if actual_duration > window_duration + 0.01:
             speed = actual_duration / window_duration
-            if speed <= 1.5:
-                safe_print(f"      Time-stretching: {speed:.2f}x to fit window")
-                pcm = _time_stretch_pcm(pcm, speed, sample_rate, ffmpeg_path)
-                segment_duration = window_duration
-            else:
-                safe_print(f"      Speed {speed:.2f}x too high, truncating instead")
-                target_bytes = int(window_duration * sample_rate * config.CHANNELS * 2)
-                target_bytes -= target_bytes % 2
-                pcm = pcm[:target_bytes]
-                segment_duration = window_duration
-        else:
-            segment_duration = actual_duration
+            safe_print(f"      Speeding up: {speed:.2f}x -> {window_duration:.2f}s")
+            pcm = _time_stretch_pcm(pcm, speed, sample_rate, ffmpeg_path)
+            actual_duration = window_duration
 
-        wav_filename = f"{lang}_seg_{i:04d}.wav"
-        wav_path = os.path.join(wav_dir, wav_filename)
         pcm_to_wav(pcm, wav_path, rate=sample_rate, channels=config.CHANNELS)
-        segments.append((wav_path, start_s, segment_duration))
-        time.sleep(6)
+        segments.append((wav_path, start_s, actual_duration))
+        time.sleep(3)
 
     if not segments:
         raise RuntimeError("No audio segments generated")

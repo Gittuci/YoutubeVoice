@@ -1,0 +1,7 @@
+Translate the following {source_lang} SRT subtitles into {target_lang}.
+STRICT RULES:
+- Preserve ALL SRT entry indexes and timestamps EXACTLY as-is — copy them verbatim.
+- Only translate the subtitle text part of each entry.
+- Keep translations natural, instructional, and concise enough to fit within the timestamp durations.
+- Output valid SRT format only — no commentary, no markdown, no extra text.
+- Start your response with the first SRT index number.

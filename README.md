@@ -17,13 +17,20 @@ German/Spanish/French, generates time-stretched WAV voiceover segments with Gemi
 ├── requirements.txt       # google-genai, openai, yt-dlp, python-dotenv
 ├── poc_tts.py             # Phase 1 proof-of-concept (standalone TTS test, Vertex AI)
 ├── run_pipeline.py        # Orchestrator: runs phases 2→5
+├── prompts/               # Prompt templates (TTS, translation, expression tags, etc.)
+│   ├── video_analysis.txt
+│   ├── tts_generation.txt
+│   ├── translate_system.txt
+│   ├── translate_gemini.txt
+│   ├── expression_tags.txt
+│   └── director_notes_{hu,en,de,es,fr}.txt
 └── pipeline/
     ├── __init__.py         # Package marker
     ├── config.py           # Centralized settings, .env loader, voice map, model names
-    ├── utils.py            # Shared: find_ffmpeg, PCM/WAV, parse_srt, build_srt, strip_markdown_fences
+    ├── utils.py            # Shared: find_ffmpeg, PCM/WAV, parse_srt, insert_srt_indices, etc.
     ├── eyes.py             # Phase 2: YouTube download → Gemini vision → Hungarian SRT
     ├── brains.py           # Phase 3: SRT translation (DeepSeek + Gemini fallback)
-    ├── voice.py            # Phase 4: SRT → TTS → time-stretched WAV segments
+    ├── voice.py            # Phase 4: SRT → TTS → speed-adjusted WAV segments
     └── fcpxml.py           # Phase 5: FCPXML generator for DaVinci Resolve
 ```
 
@@ -60,11 +67,11 @@ Parse SRT → voice validation → Gemini TTS per segment → time-stretch → s
 output/wav_segments/{lang}_seg_0001.wav, {lang}_seg_0002.wav, ...
     |
     v  [Phase 5: fcpxml.py]
-Parse SRT + read WAVs + probe video → FCPXML with gapped audio on timeline
+Parse SRT + read WAVs + probe video → FCPXML with voiceover clips at exact SRT timestamps
     |
     v
-output/fcpxml_de.fcpxml, fcpxml_es.fcpxml, fcpxml_fr.fcpxml, fcpxml_hu.fcpxml
-    → Import into DaVinci Resolve
+output/video.mp4 + fcpxml_hu.fcpxml, fcpxml_de.fcpxml, ...
+    → Import into DaVinci Resolve (self-contained project)
 ```
 
 ### Key Design Decisions
@@ -73,16 +80,24 @@ output/fcpxml_de.fcpxml, fcpxml_es.fcpxml, fcpxml_fr.fcpxml, fcpxml_hu.fcpxml
   project `foltvilag-enterprise-audio`, and location `us-central1`.
 - **TTS model** — `gemini-3.1-flash-tts-preview` generates raw L16 PCM audio.
   Individual segments are saved as WAV files using the `wave` module.
-- **Time-stretching** — Segments longer than their SRT window are sped up via ffmpeg
-  atempo filter (0.5-2.0 range). Beyond 2.0×, truncation is used as a fallback.
+- **Speed adjustment** — Segments longer than their SRT window are sped up via ffmpeg
+  `atempo` filter (chained for speeds > 2.0×). Segments shorter than their window
+  are left at natural speed — no artificial slow-down stretching.
+- **TTS prompts** — Director notes (per-language speaking style), TTS generation
+  templates, and expression tags are loaded from external prompt files in `prompts/`.
 - **Voice validation** — Before generating per-language voiceovers, a lightweight API
   call confirms the voice name is valid. Falls back through a priority chain.
-- **Translation validation** — Entry count and timestamps are compared byte-for-byte
-  against the master SRT. DeepSeek is the primary translator; Gemini (Vertex AI) is
+- **Translation validation** — Entry count (±1 tolerance) and timestamps are compared
+  against the master SRT. Missing SRT index numbers are auto-repaired via
+  `insert_srt_indices()`. DeepSeek is the primary translator; Gemini (Vertex AI) is
   the fallback after 3 failed retries.
-- **FCPXML output** — Video is placed on Track 1 (muted via `adjust-volume amount="-inf"`),
-  time-stretched WAV chunks are placed on the same track at exact SRT timestamps using
-  `<gap>` elements. Compatible with DaVinci Resolve.
+- **FCPXML output** — Original video is placed on Track 1 (muted) and copied into the
+  `output/` directory for a self-contained project. WAV voiceover clips are placed at
+  exact SRT start timestamps with no cumulative drift. Fade-in filter applied to each
+  clip. Compatible with DaVinci Resolve.
+- **WAV caching** — Existing WAV segments skip regeneration if newer than their SRT
+  file. Cached segments read actual WAV duration rather than assuming the SRT window
+  length.
 - **Error resilience** — The orchestrator gracefully skips languages that fail during
   Phase 4 (TTS) rather than aborting the entire run.
 
@@ -123,6 +138,7 @@ This runs all phases sequentially. Expected output:
 
 ```
 output/
+├── video.mp4                  # Downloaded video (self-contained project)
 ├── master_hu.srt              # Hungarian SRT from video analysis
 ├── master_de.srt              # German translation
 ├── master_es.srt              # Spanish translation
@@ -218,8 +234,8 @@ python -m pipeline.voice --input-dir output --output-dir output
 ### Step 5: Test Phase 5 — FCPXML Generation (needs Phase 4 output)
 
 ```
-# Generate FCPXML for one language
-python -m pipeline.fcpxml --lang de --srt output/master_de.srt --wav-dir output/wav_segments --video temp/video.mp4 --output output/fcpxml_de.fcpxml
+# Generate FCPXML for one language (video is auto-copied to output/)
+python -m pipeline.fcpxml --lang de --srt output/master_de.srt --wav-dir output/wav_segments --video output/video.mp4 --output output/fcpxml_de.fcpxml
 ```
 
 **What to check:**
@@ -250,7 +266,7 @@ Edit pipeline/config.py to change:
 - **Target languages**: TARGET_LANGS list (excludes Hungarian which is source)
 - **Audio settings**: SAMPLE_RATE (24000), CHANNELS (1)
 - **Output**: OUTPUT_DIR (default: `output`), WAV_SEGMENTS_DIR (default: `wav_segments`)
-- **Director's Notes**: DIRECTOR_NOTES_{HU,DE,ES,FR} — controls TTS speaking style
+- **Director's Notes**: Loaded from `prompts/director_notes_{lang}.txt` — controls TTS speaking style per language
 
 ---
 

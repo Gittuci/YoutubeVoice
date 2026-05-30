@@ -7,3 +7,4 @@ __pycache__/
 *.wav
 *.mp4
 .venv/
+vertex-key.json

@@ -3,6 +3,7 @@
 
 import os
 import sys
+import shutil
 import argparse
 
 from openai import OpenAI
@@ -162,6 +163,12 @@ def run_phase5(output_dir: str, video_path: str, all_segments: dict, langs: list
     from pipeline.fcpxml import build_fcpxml
 
     ffmpeg_path = find_ffmpeg()
+
+    output_video = os.path.join(output_dir, "video.mp4")
+    if not os.path.isfile(output_video) or os.path.getmtime(video_path) > os.path.getmtime(output_video):
+        shutil.copy2(video_path, output_video)
+        print(f"  Video copied to output: {output_video}")
+    video_path = output_video
 
     print("\n" + "=" * 60)
     print("  Phase 5: FCPXML Generation")

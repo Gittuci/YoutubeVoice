@@ -1,11 +1,18 @@
 """Centralized configuration — loads .env and exports module-level constants."""
 
 import os
+import sys
+
+# Ensure stdout handles Unicode on Windows
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from dotenv import load_dotenv
 from google import genai
 
 load_dotenv()
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(os.path.dirname(os.path.dirname(__file__)), "vertex-key.json")
 
 vertex_api_key = os.getenv("VERTEX_API_KEY")
 deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -54,36 +61,25 @@ OUTPUT_DIR = "output"
 WAV_SEGMENTS_DIR = "wav_segments"
 TEMP_DIR = "temp"
 
-DIRECTOR_NOTES_HU = (
-    "Style: Native Hungarian speaker, warm and inviting tone. "
-    "Friendly patchwork instructor demonstrating techniques with passion. "
-    "Pace: Moderate, welcoming pace. Clear articulation."
-)
-DIRECTOR_NOTES_DE = (
-    "Style: Native German speaker, precise and clear articulation. "
-    "Professional patchwork instructor with authoritative yet friendly delivery. "
-    "Pace: Steady, well-measured pace. Crisp enunciation."
-)
-DIRECTOR_NOTES_ES = (
-    "Style: Native Spanish speaker, warm and upbeat delivery. "
-    "Enthusiastic patchwork instructor with lively, engaging tone. "
-    "Pace: Natural, flowing pace. Expressive intonation."
-)
-DIRECTOR_NOTES_FR = (
-    "Style: Native French speaker, gentle and articulate tone. "
-    "Elegant patchwork instructor with calm, encouraging delivery. "
-    "Pace: Relaxed, graceful pace. Soft but clear articulation."
-)
-DIRECTOR_NOTES_EN = (
-    "Style: Native English speaker, warm and clear narrative tone. "
-    "Professional voiceover narrator with precise, natural delivery. "
-    "Pace: Steady, well-paced. Crisp enunciation with natural intonation."
-)
+def load_prompt(filename: str, **kwargs) -> str:
+    """Load a prompt template from prompts/ directory, filling {placeholders}."""
+    base = os.path.dirname(os.path.dirname(__file__))
+    path = os.path.join(base, "prompts", filename)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Prompt file not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        template = f.read().strip()
+    return template.format(**kwargs) if kwargs else template
+
+
+def _load_director_notes(lang: str) -> str:
+    """Load director notes from prompts/director_notes_{lang}.txt"""
+    return load_prompt(f"director_notes_{lang}.txt")
 
 DIRECTOR_NOTES = {
-    "hu": DIRECTOR_NOTES_HU,
-    "en": DIRECTOR_NOTES_EN,
-    "de": DIRECTOR_NOTES_DE,
-    "es": DIRECTOR_NOTES_ES,
-    "fr": DIRECTOR_NOTES_FR,
+    "hu": _load_director_notes("hu"),
+    "en": _load_director_notes("en"),
+    "de": _load_director_notes("de"),
+    "es": _load_director_notes("es"),
+    "fr": _load_director_notes("fr"),
 }

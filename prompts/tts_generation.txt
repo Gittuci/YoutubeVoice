@@ -1,0 +1,5 @@
+### DIRECTOR'S NOTES
+{director_notes}
+
+#### TRANSCRIPT
+{text}

@@ -64,6 +64,7 @@ def _get_video_info(video_path: str, ffmpeg_path: str) -> dict:
         "frame_rate": frame_rate,
         "duration": duration,
         "r_frame_rate": r_frame_rate,
+        "timebase": int(r_frame_rate.split("/")[0]),  # numerator = ticks/sec for timeline
     }
 
 
@@ -94,6 +95,7 @@ def build_fcpxml(video_path: str, srt_path: str, lang: str, wav_segments: list,
     video_info = _get_video_info(video_path, ffmpeg_path)
     video_duration = video_info["duration"]
     frame_rate = video_info["frame_rate"]
+    timebase = video_info["timebase"]  # unified timeline ticks/sec (e.g., 30000 for 29.97fps)
     frame_rate_int = int(round(frame_rate))
 
     abs_video_path = os.path.abspath(video_path).replace("\\", "/")
@@ -113,13 +115,13 @@ def build_fcpxml(video_path: str, srt_path: str, lang: str, wav_segments: list,
         "colorSpace": "1-1-1 (Rec. 709)",
     })
 
-    vid_dur_frames = _format_fcpxml_time(video_duration, frame_rate_int)
+    vid_dur_ticks = _format_fcpxml_time(video_duration, timebase)
     vid_asset = ET.SubElement(resources, "asset", {
         "id": video_asset_id,
         "name": os.path.basename(video_path),
         "src": f"file:///{abs_video_path}",
-        "start": f"0/{frame_rate_int}s",
-        "duration": vid_dur_frames,
+        "start": f"0/{timebase}s",
+        "duration": vid_dur_ticks,
         "hasAudio": "1",
         "audioChannels": "2",
         "audioRate": "48000",
@@ -151,17 +153,17 @@ def build_fcpxml(video_path: str, srt_path: str, lang: str, wav_segments: list,
     project = ET.SubElement(event, "project", {"name": f"Voiceover_{lang.upper()}"})
     sequence = ET.SubElement(project, "sequence", {
         "format": format_id,
-        "duration": vid_dur_frames,
+        "duration": vid_dur_ticks,
     })
     spine = ET.SubElement(sequence, "spine")
 
     video_audio_samples = int(round(video_duration * 48000))
     vid_clip = ET.SubElement(spine, "asset-clip", {
         "ref": video_asset_id,
-        "offset": f"0/{frame_rate_int}s",
+        "offset": f"0/{timebase}s",
         "name": "original_video",
-        "start": f"0/{frame_rate_int}s",
-        "duration": vid_dur_frames,
+        "start": f"0/{timebase}s",
+        "duration": vid_dur_ticks,
         "audioRole": "dialogue",
         "audioStart": "0/48000s",
         "audioDuration": f"{video_audio_samples}/48000s",
@@ -169,14 +171,22 @@ def build_fcpxml(video_path: str, srt_path: str, lang: str, wav_segments: list,
     ET.SubElement(vid_clip, "adjust-volume", {"amount": "-inf"})
 
     for asset_id, start_s, seg_duration, wav_name in wav_assets:
-        offset_str = _format_fcpxml_time(start_s, frame_rate_int)
+        offset_s = start_s
+        offset_str = _format_fcpxml_time(offset_s, timebase)
         wav_dur_str = _format_fcpxml_time(seg_duration, audio_sample_rate)
-        ET.SubElement(spine, "asset-clip", {
+        wav_clip = ET.SubElement(spine, "asset-clip", {
             "ref": asset_id,
             "offset": offset_str,
             "name": wav_name,
             "start": f"0/{audio_sample_rate}s",
             "duration": wav_dur_str,
+            "audioRole": "music.dialogue",
+            "lane": "1",
+        })
+        ET.SubElement(wav_clip, "audio-filter", {
+            "name": "Fade In",
+            "in": "0",
+            "out": "0",
         })
 
     tree = ET.ElementTree(root)

@@ -164,6 +164,23 @@ def strip_markdown_fences(text: str) -> str:
     return text
 
 
+def insert_srt_indices(text: str) -> str:
+    """Insert sequential index numbers before timestamp lines that lack them."""
+    lines = text.split("\n")
+    result = []
+    index = 1
+    ts_pattern = re.compile(r"^\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}")
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if ts_pattern.match(stripped):
+            prev_line = result[-1].strip() if result else ""
+            if not prev_line.isdigit() or prev_line == "" or (stripped == result[-1].strip() if result else False):
+                result.append(str(index))
+            index += 1
+        result.append(line)
+    return "\n".join(result)
+
+
 def safe_print(*args, **kwargs):
     """Print to stdout, replacing unencodable characters to avoid cp1252 crashes on Windows."""
     import sys

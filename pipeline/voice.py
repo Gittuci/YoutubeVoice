@@ -1,6 +1,5 @@
-"""Phase 4 — TTS Generation: SRT files → MP3 voiceovers via Gemini TTS."""
+"""Phase 4 — TTS Generation: SRT files → WAV voiceover segments via Gemini TTS."""
 
-import io
 import os
 import sys
 import time
@@ -11,7 +10,7 @@ from google import genai
 from google.genai import types
 
 from pipeline import config
-from pipeline.utils import parse_srt, find_ffmpeg, safe_print
+from pipeline.utils import parse_srt, find_ffmpeg, safe_print, pcm_to_wav
 
 
 def _validate_voice(client: genai.Client, voice_name: str) -> bool:
@@ -95,7 +94,6 @@ def generate_tts(client: genai.Client, text: str, voice_name: str, director_note
 
 def _generate_tts_with_retry(client, text, voice_name, director_notes, max_retries=3):
     """Generate TTS with retry on rate limit (429) errors."""
-    import time as _time
     for attempt in range(max_retries):
         try:
             return generate_tts(client, text, voice_name, director_notes)
@@ -104,7 +102,7 @@ def _generate_tts_with_retry(client, text, voice_name, director_notes, max_retri
             if "429" in err or "RESOURCE_EXHAUSTED" in err:
                 wait = (attempt + 1) * 30
                 safe_print(f"      Rate limited, waiting {wait}s before retry {attempt + 1}/{max_retries}...")
-                _time.sleep(wait)
+                time.sleep(wait)
             else:
                 raise
     raise RuntimeError(f"TTS failed after {max_retries} retries")
@@ -113,34 +111,6 @@ def _generate_tts_with_retry(client, text, voice_name, director_notes, max_retri
 def _pcm_duration(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1) -> float:
     """Calculate duration of PCM data in seconds."""
     return len(pcm_data) / (sample_rate * channels * 2)
-
-
-def _generate_silence(duration_s: float, sample_rate: int = 24000, channels: int = 1) -> bytes:
-    """Generate silent PCM data for the given duration."""
-    num_samples = int(duration_s * sample_rate * channels)
-    return b"\x00" * (num_samples * 2)
-
-
-def _pcm_to_mp3_bytes(pcm_data: bytes, ffmpeg_path: str, sample_rate: int = 24000) -> bytes:
-    """Convert PCM to MP3 via ffmpeg pipe, return bytes."""
-    cmd = [
-        ffmpeg_path, "-y",
-        "-f", "s16le",
-        "-ar", str(sample_rate),
-        "-ac", "1",
-        "-i", "pipe:0",
-        "-codec:a", "libmp3lame",
-        "-b:a", config.MP3_BITRATE,
-        "-ar", str(sample_rate),
-        "-ac", "1",
-        "-loglevel", "error",
-        "-f", "mp3",
-        "pipe:1",
-    ]
-    result = subprocess.run(cmd, capture_output=True, input=pcm_data)
-    if result.returncode != 0:
-        raise RuntimeError(f"PCM-to-MP3 conversion failed: {result.stderr}")
-    return result.stdout
 
 
 def _time_stretch_pcm(pcm_data: bytes, speed: float, sample_rate: int, ffmpeg_path: str) -> bytes:
@@ -178,8 +148,10 @@ def _build_tagged_text(entry_text: str, is_first: bool) -> str:
 
 
 def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_path: str,
-                       output_path: str) -> str:
-    """Generate a full voiceover MP3 from an SRT file for a given language."""
+                       wav_dir: str) -> list:
+    """Generate time-stretched WAV segments from an SRT file for a given language.
+    Returns list of (wav_path, start_seconds, duration) tuples.
+    """
     entries = parse_srt(srt_path)
     if not entries:
         raise ValueError(f"No entries found in {srt_path}")
@@ -187,6 +159,8 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
     director_notes = config.DIRECTOR_NOTES.get(lang, config.DIRECTOR_NOTES_HU)
     voice = _get_voice_for_lang(client, lang)
     sample_rate = config.SAMPLE_RATE
+
+    os.makedirs(wav_dir, exist_ok=True)
 
     segments = []
 
@@ -214,12 +188,11 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
 
         if actual_duration > window_duration:
             speed = actual_duration / window_duration
-            if speed <= 1.5:  # safe range for atempo (0.5-2.0)
+            if speed <= 1.5:
                 safe_print(f"      Time-stretching: {speed:.2f}x to fit window")
                 pcm = _time_stretch_pcm(pcm, speed, sample_rate, ffmpeg_path)
                 segment_duration = window_duration
             else:
-                # Too much stretch needed, fall back to truncation
                 safe_print(f"      Speed {speed:.2f}x too high, truncating instead")
                 target_bytes = int(window_duration * sample_rate * config.CHANNELS * 2)
                 target_bytes -= target_bytes % 2
@@ -228,106 +201,49 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
         else:
             segment_duration = actual_duration
 
-        segments.append((pcm, segment_duration, entry))
-        time.sleep(6)  # 10 req/min limit
+        wav_filename = f"{lang}_seg_{i:04d}.wav"
+        wav_path = os.path.join(wav_dir, wav_filename)
+        pcm_to_wav(pcm, wav_path, rate=sample_rate, channels=config.CHANNELS)
+        segments.append((wav_path, start_s, segment_duration))
+        time.sleep(6)
 
     if not segments:
         raise RuntimeError("No audio segments generated")
 
-    safe_print(f"\n  Concatenating {len(segments)} segments with time alignment...")
-    aligned_pcm = align_and_concat(segments, sample_rate)
-
-    safe_print(f"  Converting to MP3...")
-    mp3_bytes = _pcm_to_mp3_bytes(aligned_pcm, ffmpeg_path, sample_rate)
-
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    with open(output_path, "wb") as f:
-        f.write(mp3_bytes)
-
-    total_duration = _pcm_duration(aligned_pcm, sample_rate)
-    safe_print(f"  Voiceover saved: {output_path} ({total_duration:.1f}s)")
-    return output_path
-
-
-def align_and_concat(segments, sample_rate):
-    """
-    Concatenate audio segments with proper time alignment and silence gaps.
-    Applies fade-in AND fade-out on every segment boundary to eliminate clicks.
-    """
-    if not segments:
-        return b""
-
-    concat_input = io.BytesIO()
-    prev_end = None
-    fade_time = 0.02  # 20ms fade for smoother transitions
-    channels = config.CHANNELS
-    bytes_per_sample = 2
-    bytes_per_second = sample_rate * channels * bytes_per_sample
-    min_segment_bytes = int(fade_time * 2 * bytes_per_second)  # need enough for both fades
-
-    for pcm, duration, entry in segments:
-        start_s = entry["start_seconds"]
-
-        # Insert silence gap if there's space between segments
-        if prev_end is not None and start_s > prev_end:
-            gap = start_s - prev_end
-            silence = _generate_silence(gap, sample_rate)
-            concat_input.write(silence)
-
-        pcm_array = bytearray(pcm)
-
-        # Apply fade-in to the beginning of the segment
-        fade_samples = int(fade_time * sample_rate * channels)
-        if fade_samples > 0 and len(pcm_array) >= fade_samples * bytes_per_sample:
-            for s in range(fade_samples):
-                factor = float(s) / fade_samples
-                pos = s * bytes_per_sample
-                val = int.from_bytes(pcm_array[pos:pos + bytes_per_sample], "little", signed=True)
-                val = int(val * factor)
-                pcm_array[pos:pos + bytes_per_sample] = val.to_bytes(bytes_per_sample, "little", signed=True)
-
-        # Apply fade-out to the end of the segment
-        if fade_samples > 0 and len(pcm_array) >= fade_samples * bytes_per_sample:
-            end_offset = len(pcm_array) - (fade_samples * bytes_per_sample)
-            for s in range(fade_samples):
-                factor = 1.0 - (float(s) / fade_samples)
-                pos = end_offset + (s * bytes_per_sample)
-                val = int.from_bytes(pcm_array[pos:pos + bytes_per_sample], "little", signed=True)
-                val = int(val * factor)
-                pcm_array[pos:pos + bytes_per_sample] = val.to_bytes(bytes_per_sample, "little", signed=True)
-
-        concat_input.write(bytes(pcm_array))
-        prev_end = start_s + duration
-
-    return concat_input.getvalue()
+    safe_print(f"  Generated {len(segments)} WAV segments for {lang}")
+    return segments
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 4: SRT -> MP3 Voiceover")
+    parser = argparse.ArgumentParser(description="Phase 4: SRT -> WAV Voiceover Segments")
     parser.add_argument("--input-dir", default=config.OUTPUT_DIR, help="Directory containing master_*.srt files")
-    parser.add_argument("--output-dir", default=config.OUTPUT_DIR, help="Output directory for MP3s")
+    parser.add_argument("--output-dir", default=config.OUTPUT_DIR, help="Output directory for WAV segments")
     parser.add_argument("--langs", default=None, help="Comma-separated language codes (default: hu,de,es,fr)")
     args = parser.parse_args()
 
-    if not config.google_api_key:
-        safe_print("ERROR: GOOGLE_API_KEY not set. Check your .env file.")
+    if not config.vertex_api_key:
+        safe_print("ERROR: VERTEX_API_KEY not set. Check your .env file.")
         sys.exit(1)
 
     langs = args.langs.split(",") if args.langs else ["hu"] + config.TARGET_LANGS
+    for lang in langs:
+        if lang not in config.LANG_NAMES:
+            safe_print(f"ERROR: Unknown language code: {lang}")
+            sys.exit(1)
 
-    client = genai.Client(api_key=config.google_api_key)
+    client = config.create_vertex_client()
     ffmpeg_path = find_ffmpeg()
 
     os.makedirs(args.output_dir, exist_ok=True)
 
     safe_print("=" * 60)
-    safe_print("  Phase 4: TTS Voiceover Generation")
+    safe_print("  Phase 4: TTS Voiceover Generation (WAV Segments)")
     safe_print(f"  Languages: {', '.join(langs)}")
     safe_print("=" * 60)
 
     for lang in langs:
         srt_path = os.path.join(args.input_dir, f"master_{lang}.srt")
-        mp3_path = os.path.join(args.output_dir, f"voiceover_{lang}.mp3")
+        wav_dir = os.path.join(args.output_dir, config.WAV_SEGMENTS_DIR)
 
         if not os.path.isfile(srt_path):
             safe_print(f"\n  SKIP: {srt_path} not found")
@@ -335,7 +251,7 @@ def main():
 
         safe_print(f"\n  Processing {lang}...")
         try:
-            generate_voiceover(srt_path, lang, client, ffmpeg_path, mp3_path)
+            generate_voiceover(srt_path, lang, client, ffmpeg_path, wav_dir)
         except Exception as e:
             safe_print(f"  ERROR [{lang}]: {e}")
             continue

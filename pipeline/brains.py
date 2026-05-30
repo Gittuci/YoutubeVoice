@@ -1,4 +1,4 @@
-"""Phase 3 — SRT Translation: master_hu.srt → de/es/fr SRTs via DeepSeek."""
+"""Phase 3 — SRT Translation: source SRT → reference lang → target lang SRTs via DeepSeek."""
 
 import os
 import sys
@@ -80,11 +80,11 @@ def validate_translation(master_srt: str, translated_srt: str, lang: str) -> boo
     return True
 
 
-def translate_with_deepseek(master_srt: str, lang: str, client: OpenAI) -> str:
+def translate_with_deepseek(master_srt: str, lang: str, client: OpenAI, source_lang: str = "Hungarian") -> str:
     """Translate SRT using DeepSeek API."""
     lang_name = config.LANG_NAMES.get(lang, lang)
     system_prompt = (
-        f"Translate the following Hungarian SRT subtitles into {lang_name}.\n"
+        f"Translate the following {source_lang} SRT subtitles into {lang_name}.\n"
         "STRICT RULES:\n"
         "- Preserve ALL SRT entry indexes and timestamps EXACTLY as-is — copy them verbatim.\n"
         "- Only translate the subtitle text part of each entry.\n"
@@ -107,11 +107,11 @@ def translate_with_deepseek(master_srt: str, lang: str, client: OpenAI) -> str:
     return _clean_response(text)
 
 
-def translate_with_gemini(master_srt: str, lang: str, gemini_client: genai.Client) -> str:
+def translate_with_gemini(master_srt: str, lang: str, gemini_client: genai.Client, source_lang: str = "Hungarian") -> str:
     """Fallback: Translate SRT using Gemini."""
     lang_name = config.LANG_NAMES.get(lang, lang)
     prompt = (
-        f"Translate the following Hungarian SRT subtitles into {lang_name}.\n"
+        f"Translate the following {source_lang} SRT subtitles into {lang_name}.\n"
         "STRICT RULES:\n"
         "- Preserve ALL SRT entry indexes and timestamps EXACTLY as-is — copy them verbatim.\n"
         "- Only translate the subtitle text part of each entry.\n"
@@ -134,15 +134,15 @@ def translate_with_gemini(master_srt: str, lang: str, gemini_client: genai.Clien
 
 
 def translate_language(master_srt: str, lang: str, deepseek_client: OpenAI,
-                       gemini_client: genai.Client = None) -> str:
+                       gemini_client: genai.Client = None, source_lang: str = "Hungarian") -> str:
     """Translate SRT for a single language with retries and Gemini fallback."""
     lang_name = config.LANG_NAMES.get(lang, lang)
-    print(f"\n  Translating to {lang_name} ({lang})...")
+    print(f"\n  Translating from {source_lang} to {lang_name} ({lang})...")
 
     for attempt in range(3):
         try:
             print(f"    DeepSeek attempt {attempt + 1}...")
-            translated = translate_with_deepseek(master_srt, lang, deepseek_client)
+            translated = translate_with_deepseek(master_srt, lang, deepseek_client, source_lang)
             if validate_translation(master_srt, translated, lang):
                 print(f"    [{lang}] Translation validated ({len(_extract_timestamps(translated))} entries)")
                 return translated
@@ -154,10 +154,10 @@ def translate_language(master_srt: str, lang: str, deepseek_client: OpenAI,
                 print("    Retrying...")
                 time.sleep(1)
 
-    if gemini_client and config.google_api_key:
+    if gemini_client:
         print(f"    [{lang}] DeepSeek exhausted, falling back to Gemini...")
         try:
-            translated = translate_with_gemini(master_srt, lang, gemini_client)
+            translated = translate_with_gemini(master_srt, lang, gemini_client, source_lang)
             if validate_translation(master_srt, translated, lang):
                 print(f"    [{lang}] Gemini fallback validated")
                 return translated
@@ -172,6 +172,8 @@ def main():
     parser = argparse.ArgumentParser(description="Phase 3: SRT Translation")
     parser.add_argument("--input", default=None, help="Input SRT file (default: output/master_hu.srt)")
     parser.add_argument("--output-dir", default=config.OUTPUT_DIR, help="Output directory")
+    parser.add_argument("--langs", default=None, help="Comma-separated target language codes (default: de,es,fr)")
+    parser.add_argument("--source-lang", default=None, help="Source language name for the input SRT (default: Hungarian)")
     args = parser.parse_args()
 
     if not config.deepseek_api_key:
@@ -185,27 +187,35 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
+    target_langs = args.langs.split(",") if args.langs else config.TARGET_LANGS
+    for lang in target_langs:
+        if lang not in config.LANG_NAMES:
+            print(f"ERROR: Unknown language code: {lang}")
+            sys.exit(1)
+    source_lang_name = args.source_lang or config.LANG_NAMES.get(config.SOURCE_LANG, "Hungarian")
+
     deepseek_client = OpenAI(
         base_url=config.DEEPSEEK_BASE_URL,
         api_key=config.deepseek_api_key,
     )
 
     gemini_client = None
-    if config.google_api_key:
-        gemini_client = genai.Client(api_key=config.google_api_key)
+    if config.vertex_api_key:
+        gemini_client = config.create_vertex_client()
 
     print("=" * 60)
     print("  Phase 3: SRT Translation")
     print(f"  Input: {input_path}")
-    print(f"  Targets: {', '.join(config.TARGET_LANGS)}")
+    print(f"  Source: {source_lang_name}")
+    print(f"  Targets: {', '.join(target_langs)}")
     print("=" * 60)
 
     master_srt = load_master_srt(input_path)
     master_entries = _extract_timestamps(master_srt)
     print(f"  Master SRT: {len(master_entries)} entries")
 
-    for lang in config.TARGET_LANGS:
-        translated = translate_language(master_srt, lang, deepseek_client, gemini_client)
+    for lang in target_langs:
+        translated = translate_language(master_srt, lang, deepseek_client, gemini_client, source_lang_name)
         output_path = os.path.join(args.output_dir, f"master_{lang}.srt")
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(translated)

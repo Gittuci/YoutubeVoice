@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Phase 1 PoC — Gemini 3.1 Flash TTS Preview Audio Generation
-Generates a single voiceover file using gemini-3.1-flash-tts-preview.
+Phase 1 PoC — Gemini 3.1 Flash TTS Preview Audio Generation (Vertex AI)
+Generates a single voiceover file using gemini-3.1-flash-tts-preview via Vertex AI.
 
 Prerequisites:
-    pip install google-genai
-    Set GOOGLE_API_KEY environment variable (or GEMINI_API_KEY)
+    pip install google-genai python-dotenv
+    Set VERTEX_API_KEY environment variable in .env
     ffmpeg must be on system PATH
 
 Usage:
@@ -17,29 +17,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-load_dotenv()
-
 from google import genai
 from google.genai import types
 
+from pipeline import config
 from pipeline.utils import pcm_to_mp3, find_ffmpeg
-
-
-def get_api_key() -> str:
-    """Retrieve the Google Gemini API key from environment."""
-    for var in ("GOOGLE_API_KEY", "GEMINI_API_KEY"):
-        key = os.getenv(var)
-        if key:
-            return key
-    print("ERROR: Neither GOOGLE_API_KEY nor GEMINI_API_KEY environment variable is set.")
-    print("Get a key at: https://aistudio.google.com/apikey")
-    sys.exit(1)
 
 
 def generate_tts(client: genai.Client, text: str, voice_name: str = "Despina", model: str = None) -> bytes:
     """
-    Generate speech from text using Gemini TTS.
+    Generate speech from text using Gemini TTS via Vertex AI.
 
     The prompt uses Director's Notes for overall tone and style,
     plus inline audio tags (e.g., [enthusiasm]) embedded in the transcript
@@ -48,7 +35,7 @@ def generate_tts(client: genai.Client, text: str, voice_name: str = "Despina", m
     Returns raw L16 PCM bytes.
     """
     if model is None:
-        model = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
+        model = config.GEMINI_TTS_MODEL
     prompt = f"""### DIRECTOR'S NOTES
 Style: Warm, enthusiastic, instructional. The speaker is a friendly patchwork instructor demonstrating techniques with passion. The "Vocal Smile" — the listener should hear kindness and genuine excitement in every word.
 Accent: Native English speaker.
@@ -91,14 +78,18 @@ Pace: Moderate, welcoming pace. Clear articulation.
 
 
 def main():
-    model = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
+    model = config.GEMINI_TTS_MODEL
     print("=" * 60)
-    print("  Foltvilag Phase 1 PoC — Gemini 3.1 Flash TTS Preview")
+    print("  Foltvilag Phase 1 PoC — Gemini 3.1 Flash TTS Preview (Vertex AI)")
     print(f"  Model: {model}")
+    print(f"  Project: {config.VERTEX_PROJECT}")
     print("=" * 60)
 
-    api_key = get_api_key()
-    client = genai.Client(api_key=api_key)
+    if not config.vertex_api_key:
+        print("ERROR: VERTEX_API_KEY not set. Check your .env file.")
+        sys.exit(1)
+
+    client = config.create_vertex_client()
 
     text = "[enthusiasm] Welcome to Foltvilag! Today I'll show you a new technique using the EZ-Log template."
 
@@ -119,7 +110,6 @@ def main():
                 print(f"  File: {final_path}")
                 print(f"{'=' * 60}")
             except (FileNotFoundError, RuntimeError) as e:
-                # ffmpeg missing or conversion failed — save WAV fallback.
                 import wave
                 wav_path = "poc_audio.wav"
                 with wave.open(wav_path, "wb") as wf:

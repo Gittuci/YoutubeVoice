@@ -114,7 +114,6 @@ def _refine_srt(text: str) -> str:
 
 def _repair_srt_timestamps(text: str) -> str:
     """Fix common Gemini timestamp formatting errors (e.g., 0000:41,500 -> 00:00:41,500)."""
-    # Fix missing colon in hour part: 0000:41,500 -> 00:00:41,500
     text = re.sub(
         r'^(\d{4}):(\d{2}),(\d{3})',
         r'00:\2,\3',
@@ -130,14 +129,14 @@ def main():
     parser.add_argument("--output", default=config.OUTPUT_DIR, help="Output directory")
     args = parser.parse_args()
 
-    if not config.google_api_key:
-        print("ERROR: GOOGLE_API_KEY not set. Check your .env file.")
+    if not config.vertex_api_key:
+        print("ERROR: VERTEX_API_KEY not set. Check your .env file.")
         sys.exit(1)
 
     os.makedirs(args.output, exist_ok=True)
     os.makedirs(config.TEMP_DIR, exist_ok=True)
 
-    client = genai.Client(api_key=config.google_api_key)
+    client = config.create_vertex_client()
 
     print("=" * 60)
     print("  Phase 2: Video -> SRT Analysis")

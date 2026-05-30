@@ -2,7 +2,6 @@
 
 import os
 import sys
-import time
 import argparse
 import re
 import yt_dlp
@@ -31,22 +30,12 @@ def download_video(url: str, output_path: str) -> str:
 
 
 def analyze_video(video_path: str, client: genai.Client) -> str:
-    """Upload video to Gemini and get Hungarian SRT analysis."""
-    print(f"  Uploading {os.path.basename(video_path)} to Gemini File API...")
-    video_file = client.files.upload(
-        file=video_path,
-        config=types.UploadFileConfig(display_name="youtube_video"),
-    )
+    """Analyze video via Vertex AI Gemini (inline bytes, no File API upload)."""
+    print(f"  Reading {os.path.basename(video_path)} into memory...")
+    with open(video_path, "rb") as f:
+        video_bytes = f.read()
 
-    print("  Waiting for video processing...")
-    timeout = 120
-    deadline = time.time() + timeout
-    while video_file.state != "ACTIVE":
-        if time.time() > deadline:
-            raise TimeoutError(f"Video processing timed out after {timeout}s. State: {video_file.state}")
-        time.sleep(2)
-        video_file = client.files.get(name=video_file.name)
-    print(f"  Video ready (state={video_file.state})")
+    video_part = types.Part.from_bytes(data=video_bytes, mime_type="video/mp4")
 
     prompt = """You are watching a mute patchwork/quilt instructional video using EZ-Log and EZpiecer templates.
 Only hands and templates are visible -- no face, no lip movement.
@@ -64,7 +53,7 @@ Output valid SRT format only. No commentary, no markdown. Just the SRT entries."
     print("  Sending analysis prompt to Gemini...")
     response = client.models.generate_content(
         model=config.GEMINI_VISION_MODEL,
-        contents=[video_file, prompt],
+        contents=[video_part, prompt],
     )
 
     if not response.candidates:

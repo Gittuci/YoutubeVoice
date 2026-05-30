@@ -15,10 +15,9 @@ VERTEX_LOCATION = "us-central1"
 
 
 def create_vertex_client() -> genai.Client:
-    """Create a Vertex AI-routed Gemini client using API key authentication."""
+    """Create a Vertex AI-routed Gemini client using ADC authentication."""
     return genai.Client(
         vertexai=True,
-        api_key=vertex_api_key,
         project=VERTEX_PROJECT,
         location=VERTEX_LOCATION,
     )

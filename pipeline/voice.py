@@ -5,12 +5,15 @@ import sys
 import time
 import subprocess
 import argparse
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable, Optional
 
 from google import genai
 from google.genai import types
 
 from pipeline import config
-from pipeline.utils import parse_srt, find_ffmpeg, safe_print, pcm_to_wav
+from pipeline.utils import parse_srt, find_ffmpeg, safe_print, pcm_to_wav, wav_segment_name
 
 
 def _validate_voice(client: genai.Client, voice_name: str) -> bool:
@@ -158,12 +161,7 @@ def _time_stretch_pcm(pcm_data: bytes, speed: float, sample_rate: int, ffmpeg_pa
 
 
 def _build_tagged_text(entry_text: str, is_first: bool) -> str:
-    """
-    Insert audio tags into narration text for expression control.
-    - Opening entry: start with [enthusiasm]
-    - Normal entries: no leading tag
-    - Important tips: add [warm] before tip
-    """
+    """Insert audio tags into narration text for expression control."""
     tag = config.load_prompt("expression_tags.txt")
     tagged = entry_text
     if is_first:
@@ -171,13 +169,76 @@ def _build_tagged_text(entry_text: str, is_first: bool) -> str:
     return tagged
 
 
+def _process_one_segment(entry, i, total, lang, client, voice_name, director_notes,
+                          sample_rate, ffmpeg_path, wav_dir, srt_path):
+    """Process a single TTS segment — used by both sequential and parallel paths."""
+    idx = entry["index"]
+    start_s = entry["start_seconds"]
+    end_s = entry["end_seconds"]
+    text = entry["text"]
+    window_duration = end_s - start_s
+
+    wav_filename = wav_segment_name(lang, i)
+    wav_path = os.path.join(wav_dir, wav_filename)
+
+    # Skip if WAV exists and is newer than SRT
+    if os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0:
+        if os.path.getmtime(wav_path) >= os.path.getmtime(srt_path):
+            import wave
+            with wave.open(wav_path, "rb") as wf:
+                actual_duration = wf.getnframes() / wf.getframerate()
+            safe_print(f"    [{i + 1}/{total}] {idx}: {actual_duration:.1f}s — SKIP (exists)")
+            return (wav_path, start_s, actual_duration), True
+        else:
+            safe_print(f"    [{i + 1}/{total}] {idx}: {window_duration:.1f}s — REGENERATE (SRT changed)")
+
+    tagged_text = _build_tagged_text(text, i == 0)
+    safe_print(f"    [{i + 1}/{total}] {idx}: {window_duration:.1f}s — {text[:60]}...")
+
+    pcm = _generate_tts_with_retry(client, tagged_text, voice_name, director_notes)
+    pcm = _trim_leading_silence(pcm)
+
+    actual_duration = _pcm_duration(pcm, sample_rate)
+    safe_print(f"      Raw: {actual_duration:.2f}s (window: {window_duration:.2f}s)")
+
+    if actual_duration > window_duration + 0.01:
+        speed = actual_duration / window_duration
+        safe_print(f"      Speeding up: {speed:.2f}x -> {window_duration:.2f}s")
+        pcm = _time_stretch_pcm(pcm, speed, sample_rate, ffmpeg_path)
+        actual_duration = window_duration
+
+    pcm_to_wav(pcm, wav_path, rate=sample_rate, channels=config.CHANNELS)
+    return (wav_path, start_s, actual_duration), False
+
+
+class RateLimiter:
+    """Thread-safe rate limiter enforcing minimum interval between calls."""
+    def __init__(self, rpm: int):
+        self._min_interval = 60.0 / rpm if rpm > 0 else 0.0
+        self._last_call = 0.0
+        self._lock = threading.Lock()
+
+    def acquire(self):
+        with self._lock:
+            now = time.time()
+            wait = self._last_call + self._min_interval - now
+            if wait > 0:
+                time.sleep(wait)
+            self._last_call = time.time()
+
+
 def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_path: str,
-                       wav_dir: str) -> list:
+                       wav_dir: str, on_progress: Optional[Callable[[int, int, str], None]] = None) -> list:
     """Generate per-segment time-stretched WAV files from an SRT file.
     Each segment is stretched to exactly fill its SRT window — no gaps, no overlap.
     Returns list of (wav_path, start_seconds, window_duration) tuples.
+
+    Args:
+        on_progress: Optional callback(completed, total, status) for progress tracking.
+            status is one of: "init", "cached", "generating", "done", "error"
     """
     entries = parse_srt(srt_path)
+    total = len(entries)
     if not entries:
         raise ValueError(f"No entries found in {srt_path}")
 
@@ -187,54 +248,26 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
 
     os.makedirs(wav_dir, exist_ok=True)
 
+    if on_progress:
+        on_progress(0, total, "init")
+
+    safe_print(f"  Generating {total} segments for {lang}...")
     segments = []
 
-    safe_print(f"  Generating {len(entries)} segments for {lang}...")
-
     for i, entry in enumerate(entries):
-        idx = entry["index"]
-        start_s = entry["start_seconds"]
-        end_s = entry["end_seconds"]
-        text = entry["text"]
-        window_duration = end_s - start_s
-
-        wav_filename = f"{lang}_seg_{i:04d}.wav"
-        wav_path = os.path.join(wav_dir, wav_filename)
-
-        # Skip if WAV exists and is newer than SRT
-        if os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0:
-            if os.path.getmtime(wav_path) >= os.path.getmtime(srt_path):
-                import wave
-                with wave.open(wav_path, "rb") as wf:
-                    actual_duration = wf.getnframes() / wf.getframerate()
-                safe_print(f"    [{i + 1}/{len(entries)}] {idx}: {actual_duration:.1f}s — SKIP (exists)")
-                segments.append((wav_path, start_s, actual_duration))
-                continue
-            else:
-                safe_print(f"    [{i + 1}/{len(entries)}] {idx}: {window_duration:.1f}s — REGENERATE (SRT changed)")
-
-        tagged_text = _build_tagged_text(text, i == 0)
-        safe_print(f"    [{i + 1}/{len(entries)}] {idx}: {window_duration:.1f}s — {text[:60]}...")
-
         try:
-            pcm = _generate_tts_with_retry(client, tagged_text, voice, director_notes)
-            pcm = _trim_leading_silence(pcm)
+            seg, was_cached = _process_one_segment(entry, i, total, lang, client, voice,
+                                                    director_notes, sample_rate, ffmpeg_path,
+                                                    wav_dir, srt_path)
+            segments.append(seg)
+            if on_progress:
+                on_progress(i + 1, total, "cached" if was_cached else "done")
         except Exception as e:
-            safe_print(f"      TTS failed: {e}")
+            safe_print(f"    [{i + 1}/{total}] TTS failed: {e}")
+            if on_progress:
+                on_progress(i + 1, total, "error")
             raise
 
-        actual_duration = _pcm_duration(pcm, sample_rate)
-        safe_print(f"      Raw: {actual_duration:.2f}s (window: {window_duration:.2f}s)")
-
-        # Only speed up to fit the window; never slow down
-        if actual_duration > window_duration + 0.01:
-            speed = actual_duration / window_duration
-            safe_print(f"      Speeding up: {speed:.2f}x -> {window_duration:.2f}s")
-            pcm = _time_stretch_pcm(pcm, speed, sample_rate, ffmpeg_path)
-            actual_duration = window_duration
-
-        pcm_to_wav(pcm, wav_path, rate=sample_rate, channels=config.CHANNELS)
-        segments.append((wav_path, start_s, actual_duration))
         time.sleep(3)
 
     if not segments:
@@ -244,11 +277,83 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
     return segments
 
 
+def generate_voiceover_parallel(srt_path: str, lang: str, client: genai.Client, ffmpeg_path: str,
+                                 wav_dir: str, max_workers: int = 3, rpm_limit: int = 10,
+                                 on_progress: Optional[Callable[[int, int, str], None]] = None) -> list:
+    """Generate WAV segments in parallel using a thread pool with rate limiting.
+
+    Args:
+        max_workers: Maximum concurrent TTS API calls.
+        rpm_limit: Requests-per-minute limit enforced by a rate limiter.
+        on_progress: Optional callback(completed, total, status) — thread-safe.
+    """
+    entries = parse_srt(srt_path)
+    total = len(entries)
+    if not entries:
+        raise ValueError(f"No entries found in {srt_path}")
+
+    director_notes = config.DIRECTOR_NOTES.get(lang, config.DIRECTOR_NOTES["hu"])
+    voice = _get_voice_for_lang(client, lang)
+    sample_rate = config.SAMPLE_RATE
+
+    os.makedirs(wav_dir, exist_ok=True)
+
+    safe_print(f"  Generating {total} segments for {lang} (parallel, {max_workers} workers, {rpm_limit} RPM)...")
+
+    rate_limiter = RateLimiter(rpm_limit)
+    segments_lock = threading.Lock()
+    segments = []
+    completed = [0]
+    errors = []
+
+    def process_segment(i: int, entry: dict):
+        rate_limiter.acquire()
+        result, was_cached = _process_one_segment(entry, i, total, lang, client, voice,
+                                                   director_notes, sample_rate, ffmpeg_path,
+                                                   wav_dir, srt_path)
+        with segments_lock:
+            segments.append(result)
+            completed[0] += 1
+            if on_progress:
+                on_progress(completed[0], total, "cached" if was_cached else "done")
+        return result
+
+    if on_progress:
+        on_progress(0, total, "init")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(process_segment, i, entry): i for i, entry in enumerate(entries)}
+        for future in as_completed(futures):
+            i = futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                safe_print(f"    [{i + 1}/{total}] TTS failed: {e}")
+                with segments_lock:
+                    completed[0] += 1
+                    errors.append((i, str(e)))
+                    if on_progress:
+                        on_progress(completed[0], total, "error")
+
+    if errors:
+        safe_print(f"  {len(errors)} segment(s) failed: {[f'seg {e[0]}' for e in errors[:5]]}")
+
+    if not segments:
+        raise RuntimeError("No audio segments generated")
+
+    segments.sort(key=lambda s: s[1])  # sort by start_seconds for chronological order
+    safe_print(f"  Generated {len(segments)} WAV segments for {lang} ({len(errors)} failed)")
+    return segments
+
+
 def main():
     parser = argparse.ArgumentParser(description="Phase 4: SRT -> WAV Voiceover Segments")
     parser.add_argument("--input-dir", default=config.OUTPUT_DIR, help="Directory containing master_*.srt files")
     parser.add_argument("--output-dir", default=config.OUTPUT_DIR, help="Output directory for WAV segments")
     parser.add_argument("--langs", default=None, help="Comma-separated language codes (default: hu,de,es,fr)")
+    parser.add_argument("--parallel", action="store_true", help="Use parallel TTS generation")
+    parser.add_argument("--workers", type=int, default=3, help="Max parallel workers (default: 3)")
+    parser.add_argument("--rpm", type=int, default=10, help="Requests per minute limit (default: 10)")
     args = parser.parse_args()
 
     if not config.vertex_api_key:
@@ -269,6 +374,9 @@ def main():
     safe_print("=" * 60)
     safe_print("  Phase 4: TTS Voiceover Generation (WAV Segments)")
     safe_print(f"  Languages: {', '.join(langs)}")
+    safe_print(f"  Mode: {'parallel' if args.parallel else 'sequential'}")
+    if args.parallel:
+        safe_print(f"  Workers: {args.workers}, RPM: {args.rpm}")
     safe_print("=" * 60)
 
     for lang in langs:
@@ -281,7 +389,11 @@ def main():
 
         safe_print(f"\n  Processing {lang}...")
         try:
-            generate_voiceover(srt_path, lang, client, ffmpeg_path, wav_dir)
+            if args.parallel:
+                generate_voiceover_parallel(srt_path, lang, client, ffmpeg_path, wav_dir,
+                                             max_workers=args.workers, rpm_limit=args.rpm)
+            else:
+                generate_voiceover(srt_path, lang, client, ffmpeg_path, wav_dir)
         except Exception as e:
             safe_print(f"  ERROR [{lang}]: {e}")
             continue

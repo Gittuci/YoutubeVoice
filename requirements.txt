@@ -4,3 +4,4 @@ yt-dlp
 ffmpeg-python
 moviepy
 python-dotenv
+streamlit

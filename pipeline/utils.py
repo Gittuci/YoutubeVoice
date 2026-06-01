@@ -181,6 +181,21 @@ def insert_srt_indices(text: str) -> str:
     return "\n".join(result)
 
 
+def wav_segment_name(lang: str, index: int) -> str:
+    """Build WAV segment filename from language code and zero-based index."""
+    return f"{lang}_seg_{index:04d}.wav"
+
+
+def ensure_output_video(output_dir: str, video_path: str) -> str:
+    """Copy video to output dir if missing or stale. Returns the output video path."""
+    import shutil
+    output_video = os.path.join(output_dir, "video.mp4")
+    os.makedirs(output_dir, exist_ok=True)
+    if not os.path.isfile(output_video) or os.path.getmtime(video_path) > os.path.getmtime(output_video):
+        shutil.copy2(video_path, output_video)
+    return output_video
+
+
 def safe_print(*args, **kwargs):
     """Print to stdout, replacing unencodable characters to avoid cp1252 crashes on Windows."""
     import sys

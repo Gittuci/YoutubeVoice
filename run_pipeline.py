@@ -3,7 +3,6 @@
 
 import os
 import sys
-import shutil
 import argparse
 
 from openai import OpenAI
@@ -159,16 +158,12 @@ def run_phase4(input_dir: str, output_dir: str, langs: list, verbose: bool = Fal
 
 def run_phase5(output_dir: str, video_path: str, all_segments: dict, langs: list, verbose: bool = False):
     """Phase 5: Generate FCPXML files for DaVinci Resolve import"""
-    from pipeline.utils import find_ffmpeg
+    from pipeline.utils import find_ffmpeg, ensure_output_video
     from pipeline.fcpxml import build_fcpxml
 
     ffmpeg_path = find_ffmpeg()
 
-    output_video = os.path.join(output_dir, "video.mp4")
-    if not os.path.isfile(output_video) or os.path.getmtime(video_path) > os.path.getmtime(output_video):
-        shutil.copy2(video_path, output_video)
-        print(f"  Video copied to output: {output_video}")
-    video_path = output_video
+    video_path = ensure_output_video(output_dir, video_path)
 
     print("\n" + "=" * 60)
     print("  Phase 5: FCPXML Generation")

@@ -117,7 +117,7 @@ python poc_tts.py
 python run_pipeline.py --url "https://www.youtube.com/watch?v=VIDEO_ID"
 
 # Web UI
-pip install streamlit
+pip install -r requirements-ui.txt
 streamlit run webui/app.py
 ```
 

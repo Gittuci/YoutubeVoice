@@ -9,7 +9,7 @@ import wave
 from xml.etree import ElementTree as ET
 
 from pipeline import config
-from pipeline.utils import parse_srt, find_ffmpeg, wav_segment_name
+from pipeline.utils import parse_srt, find_ffmpeg, wav_segment_name, wav_is_valid
 
 
 def _get_video_info(video_path: str, ffmpeg_path: str) -> dict:
@@ -224,8 +224,8 @@ def main():
     for i, entry in enumerate(entries):
         wav_filename = wav_segment_name(args.lang, i)
         wav_path = os.path.join(args.wav_dir, wav_filename)
-        if not os.path.isfile(wav_path):
-            print(f"WARNING: WAV segment not found: {wav_path}, skipping")
+        if not wav_is_valid(wav_path):
+            print(f"WARNING: WAV segment not found or empty: {wav_path}, skipping")
             continue
         with wave.open(wav_path, "rb") as wf:
             framerate = wf.getframerate()

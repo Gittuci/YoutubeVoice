@@ -7,7 +7,7 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import pipeline.config
-from pipeline.utils import parse_srt, wav_segment_name, ensure_output_video
+from pipeline.utils import parse_srt, wav_segment_name, ensure_output_video, wav_is_valid
 
 from webui.log_capture import run_with_logs
 from webui.shared import init_session_state, STATE_KEYS
@@ -59,7 +59,7 @@ if st.button("Generate FCPXML", use_container_width=True, disabled=st.session_st
     for i, entry in enumerate(entries):
         wav_filename = wav_segment_name(selected_lang, i)
         wav_path = os.path.join(wav_dir, wav_filename)
-        if not os.path.isfile(wav_path):
+        if not wav_is_valid(wav_path):
             continue
         with wavemod.open(wav_path, "rb") as wf:
             framerate = wf.getframerate()

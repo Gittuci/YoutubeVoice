@@ -12,6 +12,7 @@ from pipeline.utils import parse_srt, wav_segment_name
 
 from webui.log_capture import run_with_logs
 from webui.shared import init_session_state, get_vertex_client, STATE_KEYS
+from pipeline.utils import wav_is_valid
 
 init_session_state()
 
@@ -27,7 +28,7 @@ def _build_segment_rows(srt_path_key, wav_dir_key, lang_key):
     for e in entries:
         wav_filename = wav_segment_name(lang_key, e["index"] - 1)
         wav_path = os.path.join(wav_dir_key, wav_filename)
-        wav_exists = os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0
+        wav_exists = wav_is_valid(wav_path)
         wav_status = "✅" if wav_exists else "⬜"
         wav_dur = ""
         if wav_exists:
@@ -49,7 +50,7 @@ def _count_existing_wavs(wav_dir_key: str, lang_key: str, total_segments: int) -
     count = 0
     for i in range(total_segments):
         wav_path = os.path.join(wav_dir_key, wav_segment_name(lang_key, i))
-        if os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0:
+        if wav_is_valid(wav_path):
             count += 1
     return count
 
@@ -124,7 +125,7 @@ if st.button("Generate Voiceover", use_container_width=True, disabled=gen_button
         from pipeline.voice import generate_voiceover_parallel
 
         progress_lock = threading.Lock()
-        gen_progress = {"completed": 0, "total": total_segments, "status": "init", "result": None, "error": None}
+        gen_progress = {"completed": 0, "total": total_segments, "status": "init", "result": None, "error": None, "errors": []}
 
         def on_progress(completed, total, status):
             with progress_lock:
@@ -134,7 +135,7 @@ if st.button("Generate Voiceover", use_container_width=True, disabled=gen_button
 
         def run_generation():
             try:
-                segments = generate_voiceover_parallel(
+                segments, errors = generate_voiceover_parallel(
                     srt_path, selected_lang, client,
                     st.session_state.ffmpeg_path, wav_dir,
                     max_workers=max_workers, rpm_limit=rpm_limit,
@@ -142,6 +143,7 @@ if st.button("Generate Voiceover", use_container_width=True, disabled=gen_button
                 )
                 with progress_lock:
                     gen_progress["result"] = segments
+                    gen_progress["errors"] = errors
             except Exception as e:
                 with progress_lock:
                     gen_progress["error"] = str(e)
@@ -179,6 +181,7 @@ if st.button("Generate Voiceover", use_container_width=True, disabled=gen_button
         with progress_lock:
             error = gen_progress["error"]
             segments = gen_progress["result"]
+            errors = gen_progress["errors"]
 
         if error:
             status_widget.update(label=f"Generation failed: {error}", state="error")
@@ -187,9 +190,22 @@ if st.button("Generate Voiceover", use_container_width=True, disabled=gen_button
             st.session_state.current_run = None
             st.stop()
 
-        progress_bar.progress(1.0, text=f"{len(segments) if segments else 0} segments done!")
-        status_widget.update(label=f"Voiceover complete! ({len(segments)}/{total_segments} segments)", state="complete")
-        st.success(f"Generated {len(segments)} WAV segments for {selected_lang}")
+        error_count = len(errors) if errors else 0
+        if error_count > 0:
+            failed_indices = [f"seg {e[0]}" for e in errors[:5]]
+            progress_bar.progress(1.0, text=f"{len(segments)} segments done ({error_count} failed)")
+            status_widget.update(
+                label=f"Voiceover complete with failures ({len(segments)}/{total_segments} segments, {error_count} errors)",
+                state="complete",
+            )
+            st.warning(f"Generated {len(segments)} WAV segments, {error_count} failed: {', '.join(failed_indices)}. Run again to retry failed segments.")
+            st.session_state.is_running = False
+            st.session_state.current_run = None
+            st.stop()
+        else:
+            progress_bar.progress(1.0, text=f"{len(segments) if segments else 0} segments done!")
+            status_widget.update(label=f"Voiceover complete! ({len(segments)}/{total_segments} segments)", state="complete")
+            st.success(f"Generated {len(segments)} WAV segments for {selected_lang}")
 
     else:
         from pipeline.voice import generate_voiceover

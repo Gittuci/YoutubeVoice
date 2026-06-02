@@ -201,7 +201,7 @@ output/video.mp4 + fcpxml_hu.fcpxml, fcpxml_de.fcpxml, ...
 Launch the web interface:
 
 ```bash
-pip install streamlit
+pip install -r requirements-ui.txt
 streamlit run webui/app.py
 ```
 

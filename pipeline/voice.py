@@ -13,7 +13,7 @@ from google import genai
 from google.genai import types
 
 from pipeline import config
-from pipeline.utils import parse_srt, find_ffmpeg, safe_print, pcm_to_wav, wav_segment_name
+from pipeline.utils import parse_srt, find_ffmpeg, safe_print, pcm_to_wav, wav_segment_name, wav_is_valid
 
 
 def _validate_voice(client: genai.Client, voice_name: str) -> bool:
@@ -182,7 +182,7 @@ def _process_one_segment(entry, i, total, lang, client, voice_name, director_not
     wav_path = os.path.join(wav_dir, wav_filename)
 
     # Skip if WAV exists and is newer than SRT
-    if os.path.isfile(wav_path) and os.path.getsize(wav_path) > 0:
+    if wav_is_valid(wav_path):
         if os.path.getmtime(wav_path) >= os.path.getmtime(srt_path):
             import wave
             with wave.open(wav_path, "rb") as wf:
@@ -268,7 +268,8 @@ def generate_voiceover(srt_path: str, lang: str, client: genai.Client, ffmpeg_pa
                 on_progress(i + 1, total, "error")
             raise
 
-        time.sleep(3)
+        if not was_cached:
+            time.sleep(3)
 
     if not segments:
         raise RuntimeError("No audio segments generated")
@@ -343,7 +344,7 @@ def generate_voiceover_parallel(srt_path: str, lang: str, client: genai.Client, 
 
     segments.sort(key=lambda s: s[1])  # sort by start_seconds for chronological order
     safe_print(f"  Generated {len(segments)} WAV segments for {lang} ({len(errors)} failed)")
-    return segments
+    return segments, errors
 
 
 def main():

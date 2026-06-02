@@ -186,6 +186,11 @@ def wav_segment_name(lang: str, index: int) -> str:
     return f"{lang}_seg_{index:04d}.wav"
 
 
+def wav_is_valid(path: str) -> bool:
+    """Check if a WAV file exists and is non-empty."""
+    return os.path.isfile(path) and os.path.getsize(path) > 0
+
+
 def ensure_output_video(output_dir: str, video_path: str) -> str:
     """Copy video to output dir if missing or stale. Returns the output video path."""
     import shutil

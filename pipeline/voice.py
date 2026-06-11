@@ -160,13 +160,9 @@ def _time_stretch_pcm(pcm_data: bytes, speed: float, sample_rate: int, ffmpeg_pa
     return result.stdout
 
 
-def _build_tagged_text(entry_text: str, is_first: bool) -> str:
-    """Insert audio tags into narration text for expression control."""
-    tag = config.load_prompt("expression_tags.txt")
-    tagged = entry_text
-    if is_first:
-        tagged = f"{tag} {tagged}"
-    return tagged
+def _build_tagged_text(entry_text: str) -> str:
+    """Pass-through — tone tags are already embedded in the SRT text."""
+    return entry_text
 
 
 def _process_one_segment(entry, i, total, lang, client, voice_name, director_notes,
@@ -192,7 +188,7 @@ def _process_one_segment(entry, i, total, lang, client, voice_name, director_not
         else:
             safe_print(f"    [{i + 1}/{total}] {idx}: {window_duration:.1f}s — REGENERATE (SRT changed)")
 
-    tagged_text = _build_tagged_text(text, i == 0)
+    tagged_text = _build_tagged_text(text)
     safe_print(f"    [{i + 1}/{total}] {idx}: {window_duration:.1f}s — {text[:60]}...")
 
     pcm = _generate_tts_with_retry(client, tagged_text, voice_name, director_notes)

@@ -49,6 +49,7 @@ st.session_state.selected_langs = set(selected)
 
 st.sidebar.subheader("Phase Progress")
 phases = [
+    ("Phase 1.5 — Transcription", st.session_state.transcribed),
     ("Phase 2 — Video & SRT", bool(st.session_state.video_path) and bool(st.session_state.srt_path)),
     ("Phase 3 — Translation", len(st.session_state.translated_langs) > 0),
     ("Phase 4 — Voiceover", len(st.session_state.tts_complete) > 0),

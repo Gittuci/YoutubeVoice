@@ -11,6 +11,8 @@ STATE_KEYS = {
     "video_path": None,
     "video_copy_path": None,
     "srt_path": None,
+    "transcribed_srt_path": None,
+    "transcribed": False,
     "translated_langs": set(),
     "tts_complete": {},
     "fcpxml_generated": {},
@@ -63,9 +65,9 @@ def scan_output_dir():
             if os.path.isfile(full):
                 files[f] = os.path.getsize(full)
     srt_files = {f for f in files if f.endswith(".srt")}
-    wav_dir = os.path.join(output_dir, pipeline.config.WAV_SEGMENTS_DIR)
     wav_files = []
     if os.path.isdir(wav_dir):
         wav_files = [f for f in os.listdir(wav_dir) if f.endswith(".wav")]
+    audio_files = {f for f in files if f.endswith(".wav") and f == "audio.wav"}
     fcpxml_files = {f for f in files if f.endswith(".fcpxml")}
-    return {"srt_files": srt_files, "wav_files": wav_files, "fcpxml_files": fcpxml_files, "all_files": files}
+    return {"srt_files": srt_files, "wav_files": wav_files, "audio_files": audio_files, "fcpxml_files": fcpxml_files, "all_files": files}

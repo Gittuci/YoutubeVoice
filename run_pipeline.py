@@ -10,9 +10,28 @@ from openai import OpenAI
 from pipeline import config
 
 
-def run_phase2(url: str, output_dir: str, temp_dir: str, verbose: bool = False):
-    """Phase 2: Download YouTube video + analyze → master_hu.srt
-    Returns (srt_path, video_path) — video_path is always returned (needed for FCPXML).
+def run_phase1_5(input_path: str, output_dir: str, language: str = "hu",
+                  transcriber: str = "gemini", verbose: bool = False):
+    """Phase 1.5: Audio transcription → SRT with tone/emotion tags."""
+    from pipeline.ears import run_transcription
+
+    print("\n" + "=" * 60)
+    print("  Phase 1.5: Audio Transcription (Tone + Emotion)")
+    print(f"  Input: {input_path}")
+    print(f"  Transcriber: {transcriber}")
+    print("=" * 60)
+
+    srt_path = run_transcription(input_path, output_dir, transcriber, language)
+    print(f"    SRT with tone tags: {srt_path}")
+    return srt_path
+
+
+def run_phase2(url: str, output_dir: str, temp_dir: str, vision_srt_name: str = "master_hu.srt",
+               verbose: bool = False):
+    """Phase 2: Download YouTube video + analyze → SRT.
+    Returns (srt_path, video_path).
+    When vision_srt_name is changed (e.g. master_hu_vision.srt), the primary
+    SRT is produced separately by Phase 1.5 transcription.
     """
     from pipeline.eyes import download_video, analyze_video, _validate_srt
 
@@ -33,7 +52,7 @@ def run_phase2(url: str, output_dir: str, temp_dir: str, verbose: bool = False):
     actual_path = download_video(url, temp_video_path)
     print(f"    Downloaded: {actual_path}")
 
-    srt_output = os.path.join(output_dir, "master_hu.srt")
+    srt_output = os.path.join(output_dir, vision_srt_name)
     try:
         srt_text = analyze_video(actual_path, client)
         srt_text = _validate_srt(srt_text)
@@ -196,13 +215,19 @@ def run_phase5(output_dir: str, video_path: str, all_segments: dict, langs: list
 
 def main():
     parser = argparse.ArgumentParser(description="Foltvilag Multi-Language Video Voiceover Pipeline")
-    parser.add_argument("--url", required=True, help="YouTube video URL")
+    parser.add_argument("--url", default=None, help="YouTube video URL")
     parser.add_argument("--output", default=config.OUTPUT_DIR, help="Output directory")
     parser.add_argument("--langs", default=None, help="Comma-separated target language codes to generate (default: de,es,fr)")
     parser.add_argument("--reference-lang", default=config.REFERENCE_LANG, help=f"Reference/pivot language for translations (default: {config.REFERENCE_LANG})")
     parser.add_argument("--skip-phase", default="", help="Comma-separated phases to skip (e.g. '2,5')")
+    parser.add_argument("--transcribe", action="store_true", help="Enable audio transcription (Phase 1.5)")
+    parser.add_argument("--audio-path", default=None, help="Standalone audio file for transcription (skip video download)")
+    parser.add_argument("--transcriber", default=config.AUDIO_TRANSCRIBER, help=f"Transcriber model (default: {config.AUDIO_TRANSCRIBER})")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     args = parser.parse_args()
+
+    if not args.url and not args.audio_path:
+        parser.error("Either --url or --audio-path must be provided")
 
     skip = set(args.skip_phase.split(",")) if args.skip_phase else set()
 
@@ -226,8 +251,12 @@ def main():
 
     print("=" * 60)
     print("  Foltvilag Pipeline")
-    print(f"  URL: {args.url}")
+    if args.url:
+        print(f"  URL: {args.url}")
+    if args.audio_path:
+        print(f"  Audio: {args.audio_path}")
     print(f"  Output: {args.output}")
+    print(f"  Transcribe: {'yes' if args.transcribe or args.audio_path else 'no'}")
     print(f"  Source: {config.LANG_NAMES.get(source_lang, source_lang)} ({source_lang})")
     print(f"  Reference: {config.LANG_NAMES.get(reference_lang, reference_lang)} ({reference_lang})")
     print(f"  Targets: {', '.join(target_langs)}")
@@ -240,15 +269,56 @@ def main():
 
     video_path = None
     all_segments = {}
+    transcribe_did_run = False
 
-    if "2" not in skip:
-        try:
-            _, video_path = run_phase2(args.url, args.output, config.TEMP_DIR, verbose=args.verbose)
-        except Exception as e:
-            print(f"\n  Phase 2 FAILED: {e}")
-            sys.exit(1)
+    # Phase 1.5 or Phase 2 (transcription path)
+    if args.audio_path and not args.url:
+        if "1.5" not in skip and "2" not in skip:
+            try:
+                run_phase1_5(args.audio_path, args.output, source_lang, args.transcriber, args.verbose)
+                transcribe_did_run = True
+            except Exception as e:
+                print(f"\n  Phase 1.5 FAILED: {e}")
+                sys.exit(1)
+    elif args.url:
+        if "2" not in skip:
+            use_transcribe = args.transcribe and "1.5" not in skip
+
+            if use_transcribe:
+                try:
+                    from pipeline.eyes import download_video, analyze_video, _validate_srt
+                    temp_video_path = os.path.join(config.TEMP_DIR, "video.mp4")
+                    video_path = download_video(args.url, temp_video_path)
+                    print(f"    Downloaded: {video_path}")
+
+                    run_phase1_5(video_path, args.output, source_lang, args.transcriber, args.verbose)
+                    transcribe_did_run = True
+
+                    client = config.create_vertex_client()
+                    print("=" * 60)
+                    print("  Phase 2: Video → SRT Analysis")
+                    print(f"  URL: {args.url}")
+                    print("=" * 60)
+                    srt_text = analyze_video(video_path, client)
+                    srt_text = _validate_srt(srt_text)
+                    vision_path = os.path.join(args.output, "master_hu_vision.srt")
+                    with open(vision_path, "w", encoding="utf-8") as f:
+                        f.write(srt_text)
+                    print(f"    Vision SRT saved: {vision_path}")
+                except Exception as e:
+                    print(f"\n  Phase 2+1.5 FAILED: {e}")
+                    sys.exit(1)
+            else:
+                try:
+                    _, video_path = run_phase2(args.url, args.output, config.TEMP_DIR,
+                                                verbose=args.verbose)
+                except Exception as e:
+                    print(f"\n  Phase 2 FAILED: {e}")
+                    sys.exit(1)
+        else:
+            print("\n  Skipping Phase 2")
     else:
-        print("\n  Skipping Phase 2")
+        print("\n  No video or audio input provided, skipping Phases 1.5/2")
 
     if "3" not in skip:
         try:
@@ -285,6 +355,11 @@ def main():
 
     print(f"\n{'=' * 60}")
     print(f"  Pipeline complete!")
+    if transcribe_did_run:
+        vision_path = os.path.join(args.output, "master_hu_vision.srt")
+        if os.path.isfile(vision_path):
+            print(f"  Audio SRT: {os.path.join(args.output, 'master_hu.srt')}")
+            print(f"  Vision SRT: {vision_path}")
     print(f"  Outputs in: {os.path.abspath(args.output)}")
     print(f"{'=' * 60}")
 

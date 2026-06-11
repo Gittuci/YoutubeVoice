@@ -1,7 +1,8 @@
 Translate the following {source_lang} SRT subtitles into {target_lang}.
 STRICT RULES:
 - Preserve ALL SRT entry indexes and timestamps EXACTLY as-is — copy them verbatim.
-- Only translate the subtitle text part of each entry.
+- Preserve ALL inline tone markers like [enthusiastic], [calm], [urgent], [explanatory], [slow], [emphatic], [questioning], [warm], [matter-of-fact], [excited], [gentle], [serious], [encouraging], [step-by-step] — keep them unchanged at the start of each text line.
+- Only translate the actual text content (words after the tone marker, if present).
 - Keep translations natural, instructional, and concise enough to fit within the timestamp durations.
 - Output valid SRT format only — no commentary, no markdown, no extra text.
 - The entire output must be a valid .srt file.

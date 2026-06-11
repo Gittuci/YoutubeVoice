@@ -30,9 +30,12 @@ def create_vertex_client() -> genai.Client:
     )
 
 GEMINI_VISION_MODEL = "gemini-2.5-flash"
+GEMINI_AUDIO_MODEL = "gemini-2.5-flash"
 GEMINI_TTS_MODEL = "gemini-3.1-flash-tts-preview"
 DEEPSEEK_MODEL = "deepseek-chat"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+AUDIO_TRANSCRIBER = "gemini"
 
 VOICE_MAP = {
     "hu": ("Despina", "Aoede"),

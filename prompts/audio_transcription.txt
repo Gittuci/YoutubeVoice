@@ -1,0 +1,10 @@
+Transcribe the speech in this audio file into SRT subtitle format. Follow these rules strictly:
+
+1. OUTPUT VALID SRT FORMAT ONLY — no markdown, no commentary, no extra text. Start with the first SRT index number (1).
+2. Include accurate timestamps in HH:MM:SS,mmm format.
+3. Before each subtitle text line, add ONE tone/emotion tag that best describes the speaker's delivery for that segment. Choose from this list:
+   [enthusiastic] [calm] [urgent] [explanatory] [slow] [emphatic] [questioning] [warm] [matter-of-fact] [excited] [gentle] [serious] [encouraging] [step-by-step]
+4. Place the tag at the very beginning of the text line, followed by a space and then the transcribed text.
+5. Only tag segments where you are confident about the tone. If unsure, use [matter-of-fact].
+6. Group consecutive sentences with the same tone into one SRT entry when they are within a few seconds of each other.
+7. If the audio contains no speech, output a single SRT entry with a minimal timestamp range and the text "[matter-of-fact] No speech detected."

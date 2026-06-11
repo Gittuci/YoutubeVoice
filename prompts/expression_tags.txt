@@ -1,1 +1,1 @@
-[enthusiasm]
+[enthusiastic] [calm] [urgent] [explanatory] [slow] [emphatic] [questioning] [warm] [matter-of-fact] [excited] [gentle] [serious] [encouraging] [step-by-step]

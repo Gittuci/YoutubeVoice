@@ -1,0 +1,118 @@
+{
+  "status": "completed",
+  "test_scope": "Hungarian TTS only; one coherent synthesis request using the four reviewed narration groups",
+  "provider": "Vertex AI",
+  "model": "gemini-2.5-pro-tts",
+  "model_status": "GA model; Hungarian language support is preview",
+  "location": "europe-west1",
+  "project": "foltvilag-enterprise-audio",
+  "credential_path": "C:\\Projects\\YoutubeVoice\\vertex-key.json",
+  "service_account": "vertex-ai-agent@foltvilag-enterprise-audio.iam.gserviceaccount.com",
+  "voice": "Despina",
+  "external_synthesis_calls": 1,
+  "usage": {
+    "input_text_tokens": 340,
+    "output_audio_tokens": 1352,
+    "total_tokens": 1692,
+    "traffic_type": "ON_DEMAND"
+  },
+  "cost": {
+    "pre_call_estimate_usd": {"low": 0.02, "high": 0.03},
+    "usage_based_estimate_usd": 0.02738,
+    "calculation": "340 × $1/1M input text tokens + 1352 × $20/1M output audio tokens",
+    "actual_billed_amount": "Not returned by the API; verify later in Google Cloud Billing."
+  },
+  "raw_audio": {
+    "path": "tts_raw.wav",
+    "duration_seconds": 54.090958,
+    "sample_rate_hz": 24000,
+    "channels": 1,
+    "format": "PCM signed 16-bit little-endian WAV",
+    "integrated_loudness_lufs": -21.41,
+    "true_peak_dbtp": -2.17,
+    "loudness_range_lu": 4.0,
+    "sha256": "6614D5A9E2BF50BE8C951E0D8CFF79FAF3C8CE196778673AFD7D49AEECFCCD67",
+    "leading_silence_trimmed": false,
+    "speed_adjustment": 1.0,
+    "time_stretch_applied": false
+  },
+  "audition_audio": {
+    "path": "tts_audition_normalized.wav",
+    "duration_seconds": 54.090958,
+    "integrated_loudness_lufs": -16.17,
+    "true_peak_dbtp": -1.44,
+    "loudness_range_lu": 3.8,
+    "processing": [
+      "20 ms fade-in",
+      "20 ms fade-out",
+      "EBU-style loudness normalization target approximately -16 LUFS / -1.5 dBTP"
+    ],
+    "sha256": "883C3A807FFE97E44116FC97D0C5DEF4AB396B3033D9AEBB31EFC3BC32493D72",
+    "speed_adjustment": 1.0,
+    "time_stretch_applied": false
+  },
+  "paragraph_boundaries": {
+    "method": "Local silence detection; split points placed near the middle of the three longest paragraph pauses",
+    "split_seconds": [11.659, 28.384, 40.847],
+    "speech_was_not_cut": "High confidence from silence intervals; human listening should still confirm."
+  },
+  "segment_placement": [
+    {
+      "id": "reviewed_narr_01",
+      "file": "segments/hu_01.wav",
+      "duration_seconds": 11.659,
+      "planned_window_seconds": [1.0, 14.5],
+      "recommended_placement_seconds": [1.0, 12.659],
+      "fits_at_natural_speed": true
+    },
+    {
+      "id": "reviewed_narr_02",
+      "file": "segments/hu_02.wav",
+      "duration_seconds": 16.725,
+      "planned_window_seconds": [16.0, 43.0],
+      "recommended_placement_seconds": [16.0, 32.725],
+      "fits_at_natural_speed": true
+    },
+    {
+      "id": "reviewed_narr_03",
+      "file": "segments/hu_03.wav",
+      "duration_seconds": 12.463,
+      "planned_window_seconds": [44.0, 72.5],
+      "recommended_placement_seconds": [47.0, 59.463],
+      "fits_at_natural_speed": true,
+      "placement_note": "A later start lets the explanation accompany the repeated middle actions without crowding the preceding narration."
+    },
+    {
+      "id": "reviewed_narr_04",
+      "file": "segments/hu_04.wav",
+      "duration_seconds": 13.243958,
+      "planned_window_seconds": [73.5, 86.0],
+      "recommended_placement_seconds": [73.111053, 86.355011],
+      "fits_at_natural_speed": true,
+      "placement_note": "Starts about 0.39 seconds earlier and ends at the exact video boundary; no acceleration is needed."
+    }
+  ],
+  "objective_assessment": {
+    "valid_wav": true,
+    "clipping_detected": false,
+    "natural_speed_preserved": true,
+    "all_segments_fit_video_duration": true,
+    "arbitrary_srt_time_stretching_required": false,
+    "subjective_voice_quality": "Requires human listening; waveform and timing checks cannot establish native pronunciation, human likeness, warmth, or prosody quality."
+  },
+  "human_listening_checklist": [
+    "Does Despina sound convincingly native in Hungarian?",
+    "Check pronunciation of: varrásráhagyást, gombostűvel, textilrétegeket, rögzítőtűt, hatszögelem.",
+    "Are the paragraph pauses natural rather than theatrical?",
+    "Does the delivery sound like an experienced instructor rather than an announcer?",
+    "Is the last paragraph comfortable, or does it feel rushed near the end?"
+  ],
+  "prohibited_actions": {
+    "translation_calls": 0,
+    "elevenlabs_calls": 0,
+    "fcpxml_generated": false,
+    "production_code_modified": false,
+    "source_video_modified": false,
+    "remote_omen_execution": false
+  }
+}

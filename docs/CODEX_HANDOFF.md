@@ -42,7 +42,7 @@ No live provider call or application-code change was made during the 2026 review
 - `pipeline/config.py` forces `GOOGLE_APPLICATION_CREDENTIALS` to that repository-local file and creates `genai.Client(vertexai=True, project="foltvilag-enterprise-audio", location="us-central1")`.
 - `VERTEX_API_KEY` is present in `.env`, but is not passed to the Vertex client. CLI/UI code incorrectly uses its presence as a prerequisite/status gate.
 - `DEEPSEEK_API_KEY` is present and is used by the OpenAI-compatible DeepSeek client.
-- No ElevenLabs credential is configured.
+- An ElevenLabs credential is configured in the repository-local `.env`; its value must never be printed, logged, documented, or committed. The key has text-to-speech and Voices read permission. The repository-local `.env` remains machine-specific and is not a portable credential mechanism.
 - Billing status, remaining credits, service-account IAM roles, and live quotas were not queried and remain unknown.
 - The intentional production authentication design is Vertex AI with service-account/ADC, not an accidental API-key setup. A Gemini Developer API mode, if added, must be a separate explicit provider profile.
 
@@ -52,9 +52,9 @@ No live provider call or application-code change was made during the 2026 review
 - `gemini-3.1-flash-tts-preview` is now a legacy preview model in the Gemini Developer API. Gemini 3.8 Flash TTS is the current flagship Developer API TTS candidate for studio-grade fidelity, expression, and long-form stability.
 - For the existing Vertex/service-account route, current Cloud/Vertex TTS candidates include Gemini 2.5 Pro TTS and Gemini 3.1 Flash TTS Preview through supported `global`, `us`, or `eu` endpoints. Hungarian is still preview in Gemini Cloud TTS; EN/DE/ES/FR are GA.
 - DeepSeek discontinued the legacy `deepseek-chat` name in July 2026. The low-cost current replacement is `deepseek-flash`; `deepseek-v4-pro` is the higher-cost alternative.
-- `faster-whisper` using multilingual large-v3 or turbo is the leading zero-marginal-cost Hungarian ASR candidate. No NVIDIA GPU was detected, so local inference may be CPU-bound.
+- `faster-whisper` using multilingual large-v3 or turbo is the leading zero-marginal-cost Hungarian ASR candidate. The initial laptop review detected no NVIDIA GPU; the later RTX workstation state is recorded below.
 - Gemini 3.5 Transcribe and Google Cloud Speech-to-Text Chirp 3 are useful cloud ASR comparisons. Cloud STT supports `hu-HU`; its first 60 minutes per month are currently free, while Hungarian Chirp 3 support is preview.
-- ElevenLabs is the most important external TTS/voice-cloning comparison. Eleven v3 is highly expressive; Flash v2.5 supports Hungarian; Professional Voice Cloning requires Creator or higher; Dubbing v2 is relevant for future voice-preserving dubbing but is much more expensive than plain TTS.
+- ElevenLabs is now the accepted Hungarian TTS baseline for this sample. Eleven v3 was more convincing than the accepted Google/Vertex comparison. Professional Voice Cloning remains deferred; Dubbing v2 is relevant for future voice-preserving dubbing but is much more expensive than plain TTS.
 - XTTS-v2 supports HU/EN/DE/ES/FR and cross-language local voice cloning, but should be treated as an experimental offline fallback until it wins a listening test and its licensing fits the intended use.
 
 ## Recommended 2026 architecture
@@ -259,6 +259,66 @@ Committed subtitle fixture:
 
 Rendered preview MP4 files are intentionally not committed; they are derived artifacts and can be regenerated from the source video, narration audio, placements, and SRT.
 
+### Accepted ElevenLabs Hungarian baseline (2026-09-27)
+
+The user-created ElevenLabs Voice Design voice is accessible through the Free-plan API. A prior assumption that it would be unavailable was disproved by successful synthesis. Community Voice Library restrictions must not be generalized to voices already saved or created in `My Voices`.
+
+Accepted configuration:
+
+- Provider/model: ElevenLabs `eleven_v3`
+- Voice ID: `ZDiQKEyPWb5ry0OWw7Ll`
+- Language: Hungarian (`hu`)
+- Output request format: `mp3_44100_128`
+- Stability: `0.5`
+- Similarity boost: `0.75`
+- Style: `0.0`
+- Speaker boost: enabled
+- Seed: `20260926`
+- Text: the exact reviewed four-unit Hungarian narration, synthesized as one coherent script
+- Raw and final speed: exactly `1.00x`; no time stretching
+- Normalized format: 24 kHz mono PCM WAV, approximately `-16 LUFS`
+
+The accepted Natural take is 40.32 seconds long. Its normalized SHA-256 is `BFDA0A1B260F17E30D94ECF0A0EEE6F8DA3251C6A5463C332AF46CC9E3B49EB0`. A Creative comparison used stability `0.0` plus a `[warmly]` cue and lasted 39.12 seconds. The user heard no meaningful advantage from Creative and selected Natural. Pronunciation, pace, and overall delivery were accepted, and the user judged ElevenLabs better than Google/Vertex for this sample.
+
+Committed provider artifacts are under `output/test_runs/2026-09-27_000442/`:
+
+- `eleven_v3_natural_raw.mp3`
+- `eleven_v3_natural_normalized.wav`
+- `run_manifest.json`
+
+The continuous Natural take was aligned locally. A discovered `faster-whisper-large-v3` model at `D:\AI_Models\Whisper\faster-whisper-large-v3` produced word timings with CPU `int8`. GPU inference was not used because the existing Python runtime could not load `cublas64_12.dll`. Do not install/replace CUDA or NVIDIA system components merely to reproduce this alignment; the accepted timings are already persisted.
+
+The continuous audio was split and placed without acceleration as follows:
+
+| Unit | Source audio | Video start | Video end |
+|---|---:|---:|---:|
+| 1 | 0.000-9.450 | 1.000 | 10.450 |
+| 2 | 9.450-21.210 | 16.000 | 27.760 |
+| 3 | 21.210-30.030 | 47.000 | 55.820 |
+| 4 | 30.030-40.320 | 73.111053 | 83.401 |
+
+The synchronized preview contains nine captions aligned to measured speech timing. The user watched the burned-subtitle preview and judged the voice, video synchronization, and subtitles "great." This supersedes the earlier Google/Vertex audio as the preferred Hungarian quality baseline; retain the Google/Vertex result as a comparison fixture.
+
+Reproducible synchronization artifacts are committed under `output/test_runs/2026-09-27_001434/`:
+
+- `captions_hu.srt`
+- `render_synced_preview.py`
+- `run_manifest.json`
+
+The renderer verifies both the authoritative video hash and accepted voice hash before doing any work. It regenerates the split WAVs, full placed WAV, selectable-subtitle MP4, and burned-subtitle MP4. Those derived media files are intentionally not committed.
+
+The project uses only `C:\Projects\YoutubeVoice\.venv` for Python dependencies. At the last verification, both Python and pip resolved inside that environment; it used Python 3.11. A virtual environment itself is not portable and is not committed. On another machine, recreate `.venv` inside the repository and install dependencies there only. Do not install packages globally or modify NVIDIA drivers/CUDA system components without explicit approval.
+
+Latest RTX workstation inspection:
+
+- GPU: NVIDIA GeForce RTX 3090, 24,576 MiB reported VRAM
+- NVIDIA driver reported by `nvidia-smi`: `616.92`
+- Project interpreter: CPython `3.11.9` from `.venv`
+- Project PyTorch: `2.10.0+cu130`, CUDA runtime `13.0`
+- `torch.cuda.is_available()`: `True`; PyTorch identifies the RTX 3090 correctly
+- `faster_whisper` is installed in `.venv`, but its GPU backend failed to load `cublas64_12.dll`; CPU `int8` was used for the completed alignment
+- The Windows Python launcher command `py` is not installed; invoke `.venv\Scripts\python.exe` explicitly
+
 ### Current model distinction
 
 - Video understanding used the current GA Vertex AI `gemini-3.8-flash` model.
@@ -313,6 +373,19 @@ For a future speech-containing Hungarian test clip, benchmark faster-whisper `la
 - high-resolution or batch media preprocessing.
 
 The laptop remains suitable for Python orchestration, FFmpeg, JSON/manifests, cloud calls, translation review, audio placement, subtitles, FCPXML, and UI work.
+
+## Immediate continuation gate
+
+The next test should be offline and cost-free: create a DaVinci Resolve delivery package from the accepted Hungarian baseline and verify FCPXML import. The package should reference the authoritative source video plus the four positioned narration WAVs and the accepted Hungarian subtitles. Check that all media paths resolve, narration and captions remain synchronized, no clip exceeds 86.355011 seconds, and Resolve reports no import errors. Do not use a compressed preview MP4 as production source media.
+
+After Resolve import succeeds, perform the first multilingual workflow test:
+
+1. Localize directly from the approved Hungarian structured meaning to English.
+2. Review and approve the English script before any TTS call.
+3. Generate English TTS, place it naturally against the same authoritative video, and derive English subtitles.
+4. Repeat independently for German, Spanish, and French only after English is accepted. Do not use English as a pivot.
+
+Before every new live provider call, state provider/model, credentials/profile, expected quota or cost, and expected artifact, then obtain approval. Voice cloning remains explicitly deferred.
 
 ## Next cloud/workflow gate
 

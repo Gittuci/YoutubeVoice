@@ -1,3 +1,17 @@
+> [!WARNING]
+> ## Legacy operator manual
+>
+> This manual documents the inherited implementation and contains known outdated
+> information, including authentication, provider/model, translation, timing,
+> and Web UI behavior.
+>
+> Do not use it as the authoritative source for current architectural decisions.
+> See `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, and `TODO.md`.
+>
+> The manual will be updated when the new production workflow is implemented.
+
+
+
 # Foltvilag — User Manual
 
 Comprehensive guide for using the multi-language video voiceover pipeline. Covers setup, Web UI, CLI, best practices, troubleshooting, and file structure.

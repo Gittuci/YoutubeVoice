@@ -1,3 +1,23 @@
+> [!IMPORTANT]
+> ## Legacy implementation documentation
+>
+> This README currently describes the inherited Kilo-era implementation that is
+> still present in the production code. It does not represent the validated
+> target architecture being developed.
+>
+> For current project direction and authoritative information, see:
+>
+> - `AGENTS.md`
+> - `docs/ARCHITECTURE.md`
+> - `docs/DECISIONS.md`
+> - `TODO.md`
+>
+> This README will be rewritten when the production pipeline has been migrated
+> to the validated architecture.
+
+
+
+
 # Foltvilag — Multi-Language Video Voiceover Pipeline
 
 Automatically generates multi-language voiceovers for mute YouTube instructional videos.

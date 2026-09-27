@@ -26,9 +26,12 @@ sections later in this historical summary.
 - The proposed YouTube work remains paused: keep original Hungarian audio and
   all French assets; replace only Hungarian descriptive audio/subtitles and
   English (United States) audio/subtitles after explicit action-time approval.
-- output/ and all new test-run media/artifacts are intentionally local-only and
-  ignored by Git. Transfer them separately if exact derived media is needed on
-  another machine, or regenerate them from the documented scripts and inputs.
+- At the user's request, output/ was cleaned locally and in the current Git
+  tree. Only output/video.mp4 remains. Test-run media, JSON, SRT, WAV, preview,
+  FCPXML, and one-off scripts below output/test_runs/ were deleted after their
+  results were documented. Older committed subsets remain in Git history; the
+  later Resolve and English artifacts were never pushed and need a new
+  controlled run if exact files are required again.
 - Before continuing elsewhere: run git pull --ff-only origin main, then read
   AGENTS.md, docs/DECISIONS.md, docs/ARCHITECTURE.md, TODO.md, and
   docs/CODEX_HANDOFF.md. Do not make a live provider call without approval.

@@ -70,7 +70,7 @@ Priorities reflect current validated workflow evidence. Product and architectura
 ## P2 — Automated quality and maintenance
 
 - [ ] Add offline unit tests for SRT parsing/repair, timestamp bounds, hashing, manifests, cache invalidation, and FCPXML path resolution.
-- [ ] Add integration fixtures using the committed authoritative video and accepted structured/audio/subtitle baselines without making live provider calls.
+- [ ] Recreate minimal non-secret integration fixtures from documented accepted behavior, using the committed authoritative video without restoring the deleted `output/test_runs/` tree wholesale or making live provider calls.
 - [ ] Add checks that private credentials and raw secret values cannot enter logs, manifests, or commits.
 - [ ] Add regression checks that production exports never use generated preview MP4s as source media.
 - [ ] Document supported Python/FFmpeg/DaVinci versions after the first successful Resolve import.

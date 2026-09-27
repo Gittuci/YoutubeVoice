@@ -12,6 +12,10 @@ The inherited application remains SRT-oriented; production code has not been ref
 
 Provider credentials are machine-specific. The initial laptop used repository-local `vertex-key.json` for Vertex service-account/ADC authentication; the RTX workstation also has an ElevenLabs credential in its local `.env`. Neither credential is stored in Git. Billing status and remaining credits were not queried.
 
+### Output retention state
+
+At the user's request on 2026-09-27, every local and tracked file below `output/` was deleted except `output/video.mp4`. The video remains tracked and its SHA-256 remains `6582AC24DF91F6CBD89F71FCBFAC7E7C7421BAE9489E71C5734F3CDA0887D7FB`. The test descriptions, settings, review outcomes, placements, and hashes below are retained as the durable record, but their referenced `output/test_runs/` paths no longer exist in the current checkout. Some older baseline files remain recoverable from Git history before the cleanup commit; the later Resolve and English run artifacts were never pushed and must be recreated by a future controlled run if needed.
+
 ### Restart point after the accepted English test (2026-09-27)
 
 The permanent documentation structure is now [AGENTS.md](../AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DECISIONS.md](DECISIONS.md), and [TODO.md](../TODO.md). `README.md` and `USER_MANUAL.md` have legacy-document warnings; they describe inherited behavior and do not override those files. Historical `.kilo/plans/` material remains untouched. The documentation work did not change application code or run another media/provider test.
@@ -211,7 +215,7 @@ The first direct Hungarian-to-English controlled workflow is complete. It used o
 
 The request, raw response, candidate, and approved result are preserved under `output/test_runs/2026-09-27_143936/`. The approved text remains the authoritative source for this English test.
 
-The `output/` tree is intentionally ignored and is not included in the current handoff commit. These exact artifacts therefore remain local to this machine unless transferred separately; the tracked handoff and scripts preserve the settings, hashes, decisions, and regeneration instructions.
+The `output/` tree is intentionally ignored, and all files from this run were deleted after their results were documented. The exact English provider and delivery artifacts are therefore unavailable in the current checkout. Recreating them requires a new controlled run and, where a live provider call is necessary, fresh approval under [AGENTS.md](../AGENTS.md).
 
 ### English narration
 
@@ -238,7 +242,7 @@ Key artifacts and hashes:
 - Burned-subtitle preview: SHA-256 `4DDF5179B68CBE68230788B4F84986E557F2C9BDBDF5FB1145D14DC6759014D9`
 - Resolve FCPXML: `resolve_delivery_en/youtubevoice_en.fcpxml`, SHA-256 `503DAFFB69EF2CB27AA3FFDAD7C366DD28F278F1A15FBB5C21711729B6A0D56B`
 
-Offline validation passed for the authoritative source hash, four narration units, interval bounds, non-overlapping captions, media-path resolution, and the rule that FCPXML uses `output/video.mp4` rather than a preview. Both previews are 86.36 seconds; the selectable preview contains the English subtitle stream, and the burned preview decoded successfully. The user watched the burned preview and accepted the narration, synchronization, and subtitles. Preview MP4s remain derived and are intentionally not committed; `build_english_synced_delivery.py` regenerates them.
+Offline validation passed for the authoritative source hash, four narration units, interval bounds, non-overlapping captions, media-path resolution, and the rule that FCPXML uses `output/video.mp4` rather than a preview. Both previews were 86.36 seconds; the selectable preview contained the English subtitle stream, and the burned preview decoded successfully. The user watched the burned preview and accepted the narration, synchronization, and subtitles. These derived files and the one-off build script were subsequently deleted under the output-retention cleanup above.
 
 ## Paused YouTube replacement plan
 
@@ -250,7 +254,7 @@ No YouTube content was deleted, uploaded, replaced, or published. A read-only in
 - English (United States) uploaded audio published and one manual subtitle published;
 - French audio and one French subtitle published.
 
-The proposed scope, still requiring explicit confirmation immediately before destructive/public actions, is:
+The proposed scope, still requiring explicit confirmation immediately before destructive/public actions and regeneration of the deleted upload files, is:
 
 1. Keep the original Hungarian audio unchanged.
 2. Replace only the Hungarian descriptive audio with `output/test_runs/2026-09-27_001434/voiceover_placed.wav` and replace its subtitles with `captions_hu.srt` from the same run.

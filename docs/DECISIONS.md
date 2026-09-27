@@ -67,3 +67,11 @@ Current experiment details and provider measurements belong in [CODEX_HANDOFF.md
 **Evidence:** The inherited `VERTEX_API_KEY` gate does not reflect actual Vertex ADC use, and Gemini 3.8 Flash TTS availability differs from the Vertex TTS catalog.
 
 **Consequence:** Provider selection and authentication must be explicit in the eventual implementation. The live-call approval procedure is maintained in [AGENTS.md](../AGENTS.md).
+
+## D009 — Target-language voices are selected per language
+
+**Decision:** Do not reuse the accepted Hungarian voice automatically for foreign-language narration. Select and review a voice that sounds natural in each target language and is suitable for the intended audience.
+
+**Evidence:** For the controlled English test, the user rejected the assumption that a Hungarian-configured voice would be the best English default, selected ElevenLabs voice `XrExE9yKIg1WjnnlVkGX`, and accepted its English narration and synchronized preview.
+
+**Consequence:** The selected English voice is a sample-specific baseline, not a universal multilingual voice. German, Spanish, and French still require their own direct localization and native-listener voice review.

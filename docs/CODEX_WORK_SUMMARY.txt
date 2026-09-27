@@ -1,0 +1,878 @@
+YOUTUBEVOICE — DETAILED CODEX WORK SUMMARY
+Prepared: 2026-09-27
+Purpose: Independent review by another advisor AI
+
+======================================================================
+CURRENT CONTINUATION UPDATE — 2026-09-27
+======================================================================
+
+This block supersedes the older "current state" and "immediate next step"
+sections later in this historical summary.
+
+- The offline DaVinci Resolve/FCPXML P0 gate is complete in Resolve 21.1 Free.
+- Resolve imported the authoritative video, four Hungarian narration clips,
+  and nine subtitle clips with all media online. The SRT must be placed at
+  1.000 second, aligned with the first narration clip.
+- A Resolve Lua validation utility is committed under scripts/resolve/.
+- The first direct Hungarian-to-English localization was completed with Vertex
+  AI gemini-3.8-flash and approved by the user.
+- English TTS was completed with ElevenLabs eleven_v3 voice
+  XrExE9yKIg1WjnnlVkGX and approved by the user.
+- English narration placement, 13 silence-aligned captions, preview, and
+  Resolve/FCPXML delivery were validated and accepted. This timing is based on
+  measured sentence pauses, not word-level ASR.
+- YouTube Studio was inspected read-only for video 4sXe2lpaPqA. No audio,
+  subtitle, or public setting was changed.
+- The proposed YouTube work remains paused: keep original Hungarian audio and
+  all French assets; replace only Hungarian descriptive audio/subtitles and
+  English (United States) audio/subtitles after explicit action-time approval.
+- output/ and all new test-run media/artifacts are intentionally local-only and
+  ignored by Git. Transfer them separately if exact derived media is needed on
+  another machine, or regenerate them from the documented scripts and inputs.
+- Before continuing elsewhere: run git pull --ff-only origin main, then read
+  AGENTS.md, docs/DECISIONS.md, docs/ARCHITECTURE.md, TODO.md, and
+  docs/CODEX_HANDOFF.md. Do not make a live provider call without approval.
+
+
+======================================================================
+1. EXECUTIVE SUMMARY
+======================================================================
+
+Codex took over an existing Python project originally developed with Kilo.ai.
+The project creates multilingual instructional voiceovers for mute or
+Hungarian-language patchwork, English Paper Piecing (EPP), Foundation Paper
+Piecing (FPP), sewing, sashiko, and textile-art videos.
+
+The inherited implementation was not modified during the work summarized here.
+Instead, Codex audited the existing design, established a controlled testing
+method, ran real provider tests, created reproducible evidence and manifests,
+and documented a recommended architecture.
+
+The main achievements were:
+
+1. Established output/video.mp4 as the sole authoritative test video.
+2. Ran one controlled Vertex AI Gemini 3.8 Flash video-understanding test.
+3. Replaced SRT-first thinking with a structured factual/action representation.
+4. Created and independently reviewed a Hungarian instructional narration.
+5. Tested Vertex Gemini 2.5 Pro TTS as a Google/Vertex comparison baseline.
+6. Placed the Hungarian narration naturally without time stretching.
+7. Generated synchronized Hungarian subtitles and preview videos.
+8. Reproduced the work on an RTX 3090 workstation.
+9. Tested ElevenLabs eleven_v3 with a user-created voice.
+10. Accepted ElevenLabs Natural as the preferred Hungarian TTS baseline for
+    this sample after user listening.
+11. Created a reproducible renderer for narration placement and captions.
+12. Committed and pushed the authoritative input and selected baselines to Git.
+13. Defined the next gate: an offline DaVinci Resolve/FCPXML import test,
+    followed by direct Hungarian-to-English localization.
+
+No production pipeline redesign has yet been implemented. Translation to target
+languages, production FCPXML verification, local TTS model benchmarking, voice
+cloning, and speech-containing Hungarian input tests remain future work.
+
+
+======================================================================
+2. INHERITED PROJECT STATE FROM KILO.AI
+======================================================================
+
+The inherited project contains these primary components:
+
+- run_pipeline.py
+  Orchestrates video analysis/transcription, translation, TTS, and FCPXML.
+
+- pipeline/eyes.py
+  Sends inline video bytes to Vertex Gemini and asks directly for Hungarian SRT.
+
+- pipeline/ears.py
+  Extracts source audio and asks Gemini for SRT with tone tags.
+
+- pipeline/brains.py
+  Uses DeepSeek first and Gemini as fallback for translation.
+
+- pipeline/voice.py
+  Generates one Gemini TTS WAV per subtitle entry and accelerates audio with
+  FFmpeg atempo whenever an utterance is longer than its SRT window.
+
+- pipeline/fcpxml.py
+  Generates FCPXML 1.12 with muted source video and positioned WAV clips.
+
+- webui/
+  Streamlit interface with incomplete/broken functionality.
+
+Important inherited limitations:
+
+- SRT is treated as the canonical internal state, even though it cannot preserve
+  evidence, uncertainty, teaching intent, terminology, or flexible timing.
+- The video-analysis prompt is hardcoded for one EPP hexagon demonstration.
+- German, Spanish, and French translation use English as a pivot rather than
+  localizing directly from Hungarian/source meaning.
+- TTS segments can be accelerated aggressively and silently to fit fixed SRT
+  windows.
+- Raw TTS duration and applied speed are not persisted.
+- WAV cache validity is based mainly on modification time rather than content and
+  configuration hashes.
+- Audio transcription validation is weaker than video/SRT validation.
+- Resume state relies too heavily on Streamlit session state.
+- The UI has an undefined wav_dir reference, an unfinished full-pipeline action,
+  and missing Streamlit in the original virtual environment.
+- There is no automated test suite, dependency lock file, or pyproject.toml.
+- The existing application configuration hardcodes older model names and a
+  us-central1 Vertex location.
+- The CLI/UI incorrectly treats VERTEX_API_KEY presence as a prerequisite even
+  though Vertex actually authenticates with service-account ADC.
+
+These issues remain open. Codex deliberately did not modify production code
+before validating the desired workflow and providers.
+
+
+======================================================================
+3. AUTHORITATIVE TEST INPUT
+======================================================================
+
+All historical generated SRT, WAV, and FCPXML files were excluded from the new
+quality baseline.
+
+Authoritative input:
+
+Path:
+  output/video.mp4
+
+Equivalent online source:
+  https://youtu.be/4sXe2lpaPqA
+
+SHA-256:
+  6582AC24DF91F6CBD89F71FCBFAC7E7C7421BAE9489E71C5734F3CDA0887D7FB
+
+Media properties:
+
+- Duration: 86.355011 seconds
+- Video: H.264
+- Resolution: 640x360
+- Frame rate: 30000/1001, approximately 29.97 fps
+- Audio: AAC stereo, 44.1 kHz
+- Mean source-audio level measured around -52.6 dB
+- No useful spoken narration was detected
+
+Visible workflow:
+
+- A transparent rigid hexagonal template is aligned with a larger fabric
+  hexagon.
+- Two pins secure the template and fabric.
+- The fabric margin is folded over successive template edges.
+- Overlapping corner folds are secured with hand stitches while the piece is
+  rotated.
+- The thread is finished/cut.
+- The pins are removed.
+- The prepared hexagonal unit is shown.
+
+The input video was force-added to Git despite broad media/output ignore rules
+so both machines can reproduce tests from the exact same bytes.
+
+
+======================================================================
+4. CREDENTIAL AND PROVIDER CONFIGURATION
+======================================================================
+
+No secret values are included in this report.
+
+Vertex AI:
+
+- Authentication: repository-local service-account JSON via ADC
+- Credential filename: vertex-key.json
+- Project: foltvilag-enterprise-audio
+- Service account identity was confirmed without exposing its private key
+- Production design intention: Vertex AI with service-account authentication
+
+DeepSeek:
+
+- A repository-local API key exists in .env
+- Inherited code still names the retired deepseek-chat model
+- Current intended low-cost replacement is deepseek-flash
+- No DeepSeek translation call was made during these tests
+
+ElevenLabs:
+
+- A repository-local credential exists in .env on the RTX workstation
+- The value was not printed, logged, documented, or committed
+- The key has text-to-speech and Voices read permission
+- One user-created My Voices voice was successfully accessible through the API
+
+Gemini Developer API:
+
+- Must be treated as a separate explicit provider profile from Vertex AI
+- Gemini Developer API keys, quotas, privacy conditions, and model availability
+  must not be conflated with Vertex service-account authentication
+
+
+======================================================================
+5. CONTROLLED VIDEO-UNDERSTANDING TEST
+======================================================================
+
+Date:
+  2026-09-26
+
+Provider/model:
+  Vertex AI gemini-3.8-flash
+
+Project/location:
+  foltvilag-enterprise-audio / eu
+
+Input:
+  output/video.mp4
+
+Successful model calls:
+  One
+
+Usage:
+
+- Input tokens: 8,869
+- Response tokens: 4,780
+- Reasoning tokens: 354
+- Total: 14,003
+
+Estimated cost from actual usage:
+  USD 0.02590425
+
+The actual billed value was not queried from Cloud Billing.
+
+The test did not ask Gemini to emit SRT as the primary output. It requested a
+structured JSON object containing:
+
+- observed action start/end times;
+- visible actions;
+- materials, tools, and components;
+- domain terminology;
+- directly visible facts;
+- reasonable instructional interpretations;
+- viewer learning needs;
+- candidate Hungarian commentary;
+- teaching intent;
+- importance;
+- confidence and uncertainty;
+- unsupported assumptions not to state;
+- safe timing flexibility.
+
+The response also contained a separate Hungarian narration and model
+self-evaluation.
+
+Codex then performed an independent local visual review using sampled video
+frames and contact sheets.
+
+Important corrections to the model output:
+
+- The fabric right side versus wrong side could not be proven visually.
+- Statements about later joining to other hexagons were future-workflow
+  assumptions, not visible facts.
+- The claim that the template remains until later joining was typical-method
+  knowledge, not evidence from this clip.
+- The model's own statement that hallucination risk was minimal was too
+  confident.
+- Better Hungarian terminology for the visible work was identified:
+  fércelés, sarokrögzítés, and az él lesimítása.
+- The terms körbevarrás and élélezés were judged weaker or misleading here.
+- Calling the method EPP is contextually reasonable, but the pixels themselves
+  establish only a rigid-template folding and hand-basting workflow.
+- The ending action boundary was adjusted because thread finishing/cutting and
+  pin removal occur later than the initial model timeline implied.
+
+Accepted structured artifacts:
+
+  output/test_runs/2026-09-26_170438/reviewed_video_analysis.json
+  output/test_runs/2026-09-26_170438/reviewed_hungarian_narration.json
+  output/test_runs/2026-09-26_170438/independent_review.json
+  output/test_runs/2026-09-26_170438/run_summary.json
+
+
+======================================================================
+6. ACCEPTED HUNGARIAN NARRATION
+======================================================================
+
+The reviewed Hungarian narration was reduced to four coherent units rather than
+many subtitle-sized fragments.
+
+Accepted text:
+
+Unit 1:
+  A kiszabott hatszög közepére igazítjuk az átlátszó sablont, majd a
+  nyílásokon át két gombostűvel rögzítjük, hogy hajtogatás közben ne
+  csússzon el.
+
+Unit 2:
+  A széleken maradt varrásráhagyást sorban a sablonra hajtjuk. A sarkoknál
+  az egymásra kerülő textilrétegeket apró kézi öltésekkel fogjuk össze; a
+  tű csak a textilen halad át.
+
+Unit 3:
+  A darabot folyamatosan forgatva haladunk körbe. Minden új oldalt a sablon
+  élére simítunk, majd a következő saroknál rögzítjük a hajtást.
+
+Unit 4:
+  Amikor körbeértünk, elvágjuk a cérnát, és kihúzzuk a két rögzítőtűt. A
+  sablon ekkor még a textilben marad, a behajtott hatszögelem pedig
+  elkészült.
+
+The narration was designed for:
+
+- natural instructor delivery;
+- complete sentences and phrase endings;
+- natural pauses;
+- flexible placement around repeated visible actions;
+- no invented measurements or stitch counts;
+- no forced speed-up.
+
+
+======================================================================
+7. GOOGLE/VERTEX HUNGARIAN TTS BASELINE
+======================================================================
+
+Provider/model:
+  Vertex AI gemini-2.5-pro-tts
+
+Voice:
+  Despina
+
+Location:
+  europe-west1
+
+Request design:
+  One coherent synthesis request containing all four narration paragraphs
+
+Usage:
+
+- Input text tokens: 340
+- Output audio tokens: 1,352
+- Total tokens: 1,692
+
+Estimated cost from actual usage:
+  USD 0.02738
+
+Raw audio:
+
+- Duration: 54.090958 seconds
+- Format: 24 kHz, mono, signed 16-bit PCM WAV
+- Peak: approximately -2.25 dBFS
+- RMS: approximately -22.01 dBFS
+- No leading-silence trimming
+- No time stretching
+- Speed: exactly 1.00x
+
+Audition processing:
+
+- Preserved raw output separately
+- Added approximately 20 ms fade-in/fade-out
+- Loudness-normalized audition to approximately -16.17 LUFS
+- True peak approximately -1.44 dBTP
+- No speed adjustment
+
+The continuous take was divided at measured long pauses into four clips so the
+paragraphs could be distributed across the 86-second visual workflow. The split
+was necessary because placing the full 54-second file at the beginning would
+make later paragraphs occur much too early.
+
+Accepted placement for the Vertex comparison:
+
+Unit 1: 1.000 to 12.659
+Unit 2: 16.000 to 32.725
+Unit 3: 47.000 to 59.463
+Unit 4: 73.111 to 86.355
+
+All units fit at natural speed. The fourth unit used safe earlier placement
+rather than acceleration.
+
+Key artifacts:
+
+  output/test_runs/2026-09-26_174358/request.json
+  output/test_runs/2026-09-26_174358/response_metadata.json
+  output/test_runs/2026-09-26_174358/test_report.json
+  output/test_runs/2026-09-26_174358/tts_audition_normalized.wav
+
+The user judged this voice acceptable for validating the pipeline, workflow,
+and services, while explicitly reserving more expressive voice tests for later.
+
+
+======================================================================
+8. FIRST LOCAL TIMING PREVIEW AND SUBTITLES
+======================================================================
+
+Codex generated a non-destructive preview locally with FFmpeg:
+
+- Original H.264 video stream copied without re-encoding
+- Original source audio omitted/muted
+- Four narration WAVs delayed to their recommended starts
+- AAC mono narration output
+- Total duration exactly matched the source video
+
+The user judged the synchronized Hungarian preview very good.
+
+Hungarian subtitles were then derived from accepted narration and measured
+speech pauses, not directly from arbitrary visual action windows.
+
+Subtitle design:
+
+- Nine SRT entries
+- Readable clauses/sentences
+- Hungarian characters verified
+- All timestamps within 86.355011 seconds
+- Soft-subtitle MP4 created with mov_text
+- Burned-subtitle MP4 created for easy visual review
+- Bottom-centered white text with black outline
+
+Committed subtitle fixtures:
+
+  output/test_runs/2026-09-26_180852/captions_hu.srt
+  output/test_runs/2026-09-26_180852/subtitle_manifest.json
+
+Derived preview MP4 files were intentionally not committed because they can be
+regenerated.
+
+
+======================================================================
+9. RTX 3090 WORKSTATION CONTINUATION
+======================================================================
+
+The repository was committed and pushed to GitHub, then pulled onto an HP OMEN
+workstation for GPU-heavy local testing.
+
+Workstation state recorded in the handoff:
+
+- GPU: NVIDIA GeForce RTX 3090
+- Reported VRAM: 24,576 MiB
+- NVIDIA driver: 616.92
+- Project Python: CPython 3.11.9
+- Project environment: repository-local .venv
+- PyTorch: 2.10.0+cu130
+- PyTorch CUDA runtime: 13.0
+- torch.cuda.is_available(): True
+- PyTorch correctly identifies the RTX 3090
+- The Windows py launcher is not installed
+- Commands should invoke .venv\Scripts\python.exe explicitly
+
+Environment policy:
+
+- Each repository uses its own .venv.
+- Packages must not be installed globally.
+- The virtual environment is machine-specific and is not committed.
+- NVIDIA drivers and system CUDA components must not be replaced without
+  explicit approval.
+
+A local faster-whisper large-v3 model was discovered at:
+
+  D:\AI_Models\Whisper\faster-whisper-large-v3
+
+faster-whisper was installed in the project environment. However, its GPU
+backend could not load cublas64_12.dll. The completed alignment therefore used
+CPU int8 inference. No driver or CUDA replacement was attempted merely to fix
+this because the accepted alignment was already obtained and system-level GPU
+changes require explicit approval.
+
+Important limitation:
+
+The authoritative video contains no useful Hungarian speech and is therefore
+not a valid Hungarian ASR quality benchmark. Whisper was used only to align the
+generated narration, not to judge Hungarian source-speech transcription.
+
+
+======================================================================
+10. ELEVENLABS HUNGARIAN TTS TEST
+======================================================================
+
+The RTX workstation tested a user-created ElevenLabs Voice Design voice.
+
+An earlier assumption that Free-plan API access might not work was disproved by
+successful synthesis. Restrictions affecting Community Voice Library access
+must not be generalized to voices already saved or created in My Voices.
+
+Accepted configuration:
+
+- Provider/model: ElevenLabs eleven_v3
+- Voice ID: ZDiQKEyPWb5ry0OWw7Ll
+- Language: Hungarian (hu)
+- Requested output: mp3_44100_128
+- Stability: 0.5
+- Similarity boost: 0.75
+- Style: 0.0
+- Speaker boost: enabled
+- Seed: 20260926
+- Input: exact reviewed four-unit Hungarian narration
+- One coherent full-script synthesis
+- Raw/final speed: 1.00x
+- No time stretching
+- Normalized comparison: 24 kHz mono PCM WAV at approximately -16 LUFS
+
+Two takes were compared:
+
+Natural:
+
+- Stability 0.5
+- No special expressive cue
+- Duration 40.32 seconds
+- Selected by the user
+
+Creative:
+
+- Stability 0.0
+- Included a [warmly] cue
+- Duration 39.12 seconds
+- User heard no meaningful advantage over Natural
+
+User evaluation:
+
+- Pronunciation accepted
+- Pace accepted
+- Overall delivery accepted
+- Natural selected over Creative
+- ElevenLabs judged better than Google/Vertex for this Hungarian sample
+
+Accepted normalized ElevenLabs SHA-256:
+
+  BFDA0A1B260F17E30D94ECF0A0EEE6F8DA3251C6A5463C332AF46CC9E3B49EB0
+
+Committed ElevenLabs artifacts:
+
+  output/test_runs/2026-09-27_000442/eleven_v3_natural_raw.mp3
+  output/test_runs/2026-09-27_000442/eleven_v3_natural_normalized.wav
+  output/test_runs/2026-09-27_000442/run_manifest.json
+
+The ElevenLabs Natural take now supersedes the Vertex audio as the preferred
+Hungarian quality baseline. The Vertex result is retained as a comparison
+fixture.
+
+
+======================================================================
+11. ELEVENLABS SYNCHRONIZATION AND CAPTIONS
+======================================================================
+
+The continuous ElevenLabs take was aligned using word timings from
+faster-whisper large-v3 running on CPU int8.
+
+Accepted splits and placements:
+
+Unit 1:
+  Source audio 0.000 to 9.450
+  Video placement 1.000 to 10.450
+
+Unit 2:
+  Source audio 9.450 to 21.210
+  Video placement 16.000 to 27.760
+
+Unit 3:
+  Source audio 21.210 to 30.030
+  Video placement 47.000 to 55.820
+
+Unit 4:
+  Source audio 30.030 to 40.320
+  Video placement 73.111053 to 83.401
+
+No acceleration was applied.
+
+Nine Hungarian captions were aligned to measured speech timing. A selectable
+subtitle preview and a burned-subtitle preview were regenerated. The user
+watched the burned version and judged the voice, synchronization, and subtitles
+“great.”
+
+Reproducible synchronization artifacts:
+
+  output/test_runs/2026-09-27_001434/captions_hu.srt
+  output/test_runs/2026-09-27_001434/render_synced_preview.py
+  output/test_runs/2026-09-27_001434/run_manifest.json
+
+The renderer checks both:
+
+- authoritative source-video hash;
+- accepted ElevenLabs voice hash.
+
+It can regenerate:
+
+- four split WAV files;
+- a full placed narration WAV;
+- a selectable-subtitle MP4;
+- a burned-subtitle MP4.
+
+Derived media outputs are intentionally not committed.
+
+
+======================================================================
+12. CURRENT MODEL STATUS AND DECISIONS
+======================================================================
+
+Video understanding:
+
+- Tested and accepted for workflow validation:
+  Vertex AI gemini-3.8-flash
+- This is the current GA multimodal workhorse.
+
+Google/Vertex TTS:
+
+- Tested:
+  Vertex gemini-2.5-pro-tts
+- Newest numbered TTS currently available through Vertex:
+  gemini-3.1-flash-tts-preview
+- Vertex 3.1 is preview and available through the global endpoint.
+
+Gemini Developer API TTS:
+
+- Current flagship:
+  gemini-3.8-flash-tts
+- Supports Hungarian
+- Designed for expressive/studio-grade fidelity and long-form stability
+- Must be configured as a separate Developer API provider profile
+- Has not yet been tested in this repository
+
+ElevenLabs:
+
+- eleven_v3 Natural is the current preferred Hungarian quality baseline for this
+  sample.
+- Professional Voice Cloning and Dubbing v2 remain deferred.
+
+Local TTS:
+
+- XTTS-v2 remains an experimental candidate.
+- It must win a listening comparison and pass license/commercial-use review.
+- No accepted local TTS generation result has yet been recorded.
+
+Translation:
+
+- No production-quality target-language translation test has yet been run.
+- Inherited English-pivot architecture is rejected for the future design.
+- Each language must localize directly from approved Hungarian/source meaning.
+
+
+======================================================================
+13. RECOMMENDED ARCHITECTURE
+======================================================================
+
+SRT should not be the source of truth.
+
+Recommended canonical state:
+  a structured, versioned project document containing semantic units.
+
+Each unit should retain:
+
+- source meaning and evidence;
+- visible actions, tools, materials, components, and timestamps;
+- teaching intent;
+- importance: required/useful/optional;
+- terminology and pronunciation hints;
+- tone, emphasis, rhythm, and speaker identity;
+- hard and soft timing bounds;
+- safe placement flexibility;
+- localized scripts;
+- provider/model/voice configuration;
+- input hashes;
+- raw/final audio durations;
+- placement and speed adjustments;
+- confidence, uncertainty, and human-review state.
+
+Recommended flow:
+
+1. Ingest and probe media.
+2. Determine whether useful source speech exists.
+3. Build independent speech and visual timelines when applicable.
+4. Fuse evidence into semantic instructional units.
+5. Review and lock meaning and terminology.
+6. Localize directly into each target language.
+7. Plan narration windows and fit text before TTS.
+8. Generate/audition coherent speech groups.
+9. Place, mix, normalize, and validate audio.
+10. Derive SRT and FCPXML as exports.
+
+Mute-video policy:
+
+- First pass: factual visual timeline with evidence/confidence.
+- Second pass: instructional commentary based on the approved timeline.
+- Do not force one model call to understand the technique and immediately emit
+  final SRT.
+
+Speech-containing-video policy:
+
+- Hungarian speech is the primary semantic source.
+- Vision supplies complementary evidence.
+- Visual evidence may disambiguate “this,” “here,” or “the other side.”
+- Corrections and additions must be reviewable and traceable.
+- Support faithful dubbing and enhanced instructional localization as separate
+  modes.
+
+
+======================================================================
+14. NATURAL-SPEECH TIMING POLICY
+======================================================================
+
+Priority order:
+
+1. Natural speech quality
+2. Correct instructional meaning
+3. Professional terminology
+4. Natural target-language phrasing
+5. Timing fit
+
+If narration is too long:
+
+1. Remove nonessential wording.
+2. Rewrite more concisely and idiomatically.
+3. Improve segmentation or merge adjacent units.
+4. Shift placement within safe visual bounds.
+5. Redistribute narration across nearby silence or ongoing work.
+6. Regenerate TTS.
+7. Only then consider a small pitch-preserving speed adjustment.
+
+Suggested limits:
+
+- Approximately 1.03x may be acceptable by default.
+- Above 1.05x requires explicit warning and review.
+- Never silently exceed the configured ceiling.
+
+Always preserve:
+
+- raw audio;
+- raw duration;
+- final audio;
+- final duration;
+- applied speed;
+- source text revision;
+- placement;
+- provider/model/voice configuration.
+
+
+======================================================================
+15. CURRENT GIT/HANDOFF STATE
+======================================================================
+
+Codex created and pushed the first comprehensive handoff/baseline commit:
+
+  9e5adda docs: preserve controlled test handoff and baselines
+
+The RTX workstation then pushed:
+
+  01dc797 docs: preserve accepted ElevenLabs baseline
+
+Current local branch after synchronization:
+
+- Branch: main
+- Local state matches origin/main
+- Latest commit: 01dc797
+- Authoritative handoff: docs/CODEX_HANDOFF.md
+- Authoritative video hash verified after pull
+
+Credentials, private keys, .env values, temporary frame samples, raw provider
+responses, and large derived preview videos were not committed.
+
+
+======================================================================
+16. UNRESOLVED ENGINEERING WORK
+======================================================================
+
+1. Replace hardcoded provider/model/location settings with explicit profiles.
+2. Remove the incorrect VERTEX_API_KEY prerequisite for ADC-based Vertex use.
+3. Replace the hardcoded one-video visual prompt with domain profiles.
+4. Introduce a structured canonical project document and versioning.
+5. Add robust audio-transcription validation and repair.
+6. Remove the English translation pivot.
+7. Add a multilingual terminology database with approved/prohibited terms.
+8. Replace mtime caching with content/configuration hashes.
+9. Persist a complete run manifest and reconstruct resume state from disk.
+10. Prevent orphaned outputs after script revisions.
+11. Make FCPXML generation reconstruct valid cached inputs.
+12. Validate all timestamps and media paths before export.
+13. Fix Streamlit scan_output_dir undefined wav_dir.
+14. Implement the Web UI full-pipeline action.
+15. Pin dependencies and create a lock strategy.
+16. Add offline unit/integration tests.
+17. Decide production provider policies per language through native listening.
+18. Test real Hungarian source speech; current video cannot validate ASR.
+19. Resolve or isolate the faster-whisper GPU cublas64_12.dll mismatch without
+    destabilizing the working PyTorch/driver environment.
+20. Evaluate local TTS candidates and licenses.
+
+
+======================================================================
+17. IMMEDIATE NEXT STEP
+======================================================================
+
+The next recommended test is offline and cost-free:
+
+Create a DaVinci Resolve delivery package from the accepted ElevenLabs Hungarian
+baseline and verify FCPXML import.
+
+The package should contain/reference:
+
+- authoritative output/video.mp4;
+- four positioned narration WAV clips derived from the accepted ElevenLabs take;
+- accepted Hungarian subtitles;
+- FCPXML with valid, resolvable media paths;
+- a manifest containing hashes, durations, and placements.
+
+Validation requirements:
+
+- Resolve imports without errors.
+- The authoritative source video is used, not a compressed preview.
+- All referenced files exist.
+- Narration placement matches accepted timing.
+- Captions remain synchronized.
+- No clip exceeds 86.355011 seconds.
+- Resolve import log is reviewed.
+
+After successful Resolve import:
+
+1. Localize directly from approved Hungarian meaning to English.
+2. Review and approve the English script before any TTS call.
+3. Generate English TTS using the selected provider/voice candidate.
+4. Place it naturally against the authoritative video.
+5. Derive English subtitles.
+6. Repeat independently for German, Spanish, and French only after English is
+   accepted.
+
+English must not become a pivot source for German, Spanish, or French.
+
+
+======================================================================
+18. QUESTIONS FOR AN INDEPENDENT ADVISOR
+======================================================================
+
+The advisor may wish to evaluate:
+
+1. Is the structured semantic-unit architecture sufficiently specified?
+2. Should the next implementation milestone be the new project document,
+   provider profiles, or FCPXML validation?
+3. Is ElevenLabs eleven_v3 an appropriate production default per language, or
+   only a Hungarian baseline pending native review in EN/DE/ES/FR?
+4. Should Gemini 3.8 Flash TTS be tested before multilingual production work?
+5. Which local TTS models are realistic on an RTX 3090 for HU/EN/DE/ES/FR,
+   considering quality, licensing, and voice preservation?
+6. What is the safest way to resolve faster-whisper/CTranslate2 CUDA library
+   compatibility without disturbing PyTorch 2.10.0+cu130 and the installed
+   NVIDIA driver?
+7. What evaluation rubric and blind-listening design should be used per language?
+8. Which FCPXML version/features are safest for the installed DaVinci Resolve
+   version?
+9. How should subtitle timing be derived robustly from final synthesized speech?
+10. How should the system distinguish faithful dubbing from enhanced
+    instructional localization in the data model and UI?
+11. What dependency-locking strategy is best for Windows laptop plus RTX
+    workstation operation?
+12. Which artifacts should be committed, stored externally, or regenerated?
+
+
+======================================================================
+19. SAFETY AND PROCESS CONSTRAINTS
+======================================================================
+
+- Never expose or commit vertex-key.json private contents.
+- Never expose or commit .env secret values.
+- Do not overwrite output/video.mp4.
+- Do not treat generated previews as authoritative source media.
+- Before every live provider call, state provider/model, credential/profile,
+  project/location where relevant, expected quota/cost, and expected artifact;
+  then obtain approval.
+- Do not install or replace NVIDIA drivers or system CUDA components without
+  explicit approval.
+- Do not install Python packages globally.
+- Keep this repository isolated in its own .venv.
+- Store new experiments under timestamped output/test_runs directories.
+- Preserve raw and final artifacts plus hashes and manifests.
+- Do not infer measurements, hidden steps, materials, tools, or intentions from
+  generic sewing knowledge when they are not visible or spoken.
+- Do not use English as a translation pivot.
+- Do not force narration into arbitrary subtitle windows.
+
+
+END OF SUMMARY

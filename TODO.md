@@ -6,10 +6,10 @@ Priorities reflect current validated workflow evidence. Product and architectura
 
 ## P0 — Next validation gate
 
-- [ ] Build a non-destructive DaVinci Resolve delivery package from the accepted Hungarian ElevenLabs baseline: authoritative source video, four positioned narration WAVs, Hungarian subtitles, manifest, and FCPXML.
-- [ ] Validate that every media path resolves and every clip/caption stays within the authoritative source duration recorded in `docs/CODEX_HANDOFF.md`.
-- [ ] Import the FCPXML into the supported DaVinci Resolve version and record the import result/log and any compatibility corrections.
-- [ ] Confirm that the imported timeline uses `output/video.mp4`, not a compressed preview.
+- [x] Build a non-destructive DaVinci Resolve delivery package from the accepted Hungarian ElevenLabs baseline: authoritative source video, four positioned narration WAVs, Hungarian subtitles, manifest, and FCPXML.
+- [x] Validate that every media path resolves and every clip/caption stays within the authoritative source duration recorded in `docs/CODEX_HANDOFF.md`.
+- [x] Import the FCPXML into the supported DaVinci Resolve version and record the import result/log and any compatibility corrections.
+- [x] Confirm that the imported timeline uses `output/video.mp4`, not a compressed preview.
 
 ## P1 — Canonical project state
 
@@ -42,7 +42,8 @@ Priorities reflect current validated workflow evidence. Product and architectura
 - [ ] Replace the English-pivot translation flow with direct Hungarian/source-to-target localization for EN, DE, ES, and FR.
 - [ ] Create a versioned multilingual termbase with approved/prohibited translations, product spelling, pronunciation hints, and technique applicability.
 - [ ] Validate terminology, meaning, evidence boundaries, and prosody metadata—not only subtitle count and timestamps.
-- [ ] Run the first controlled direct Hungarian-to-English localization test and obtain script approval before English TTS.
+- [x] Run the first controlled direct Hungarian-to-English localization test and obtain script approval before English TTS.
+- [x] Complete and review the controlled English TTS, silence-aligned captions, synchronized preview, and Resolve/FCPXML delivery fixture.
 - [ ] Repeat independently for German, Spanish, and French only after the English workflow is accepted.
 
 ## P1 — Narration, audio, and subtitles
@@ -59,6 +60,7 @@ Priorities reflect current validated workflow evidence. Product and architectura
 
 ## P2 — Export and UI
 
+- [ ] After explicit destructive/publish confirmation, replace the existing Hungarian descriptive audio/subtitles and English (United States) audio/subtitles on YouTube video `4sXe2lpaPqA`; preserve the Hungarian original and all French tracks unchanged.
 - [ ] Update FCPXML generation to consume the canonical project document and validated media manifest.
 - [ ] Fix `scan_output_dir()` using undefined `wav_dir`.
 - [ ] Implement the Streamlit full-pipeline action.

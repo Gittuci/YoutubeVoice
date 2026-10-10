@@ -120,6 +120,7 @@ Visual understanding and final subtitle authoring must not be collapsed into one
 
 - Localize independently from approved Hungarian/source meaning into EN, DE, ES, and FR.
 - English may be a reviewer reference but is not a pivot source for the other languages.
+- TTS selection prioritizes EN, DE, ES, and FR independently. Hungarian synthesis is optional because users can record Hungarian narration themselves; missing or weaker Hungarian TTS must not exclude a strong target-language model. Provider/model/voice choices may differ by language (D010).
 - Plan complete sentences or short coherent utterance groups against flexible visual windows before synthesis.
 - Preserve provider output and derive speech-aligned captions from final audio.
 - Apply the natural-speech fitting policy in [AGENTS.md](../AGENTS.md) and the decision record in [DECISIONS.md](DECISIONS.md).

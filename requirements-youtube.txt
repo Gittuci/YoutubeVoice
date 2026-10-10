@@ -1,0 +1,4 @@
+# Optional, project-local YouTube caption audit pilot (not production pipeline).
+google-auth==2.53.0
+google-auth-oauthlib==1.5.0
+requests==2.34.2

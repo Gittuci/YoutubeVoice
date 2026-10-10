@@ -1,0 +1,182 @@
+{
+  "archive": "media_and_metadata.zip",
+  "archive_sha256": "c27c0010b263d42104051f5f0e261a755379e7a19a7c4d81e97aa0c68c939289",
+  "files": [
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/upload_manifest.json",
+      "bytes": 13659,
+      "sha256": "4fad8a337c653b0f601f2fc3ae8fd488516e0ffe71a4d8dcea2b95a64b522e7b"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/FELTOLTES.md",
+      "bytes": 930,
+      "sha256": "e5a78d36ba89c86b491f4fe0661357b770a32174c698988acfaa3aa7099e28e4"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/hu-HU/hu-HU.wav",
+      "bytes": 4145084,
+      "sha256": "eb0781ac9e7db974b6287ed9d4d351149befd7a5dfe57065bd6c0a5ef04beeeb"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/hu-HU/hu-HU.srt",
+      "bytes": 1237,
+      "sha256": "81e9e859efc95fa80e7363877802c9cf15f6690276ac32d1f4b9d8bd71d6b427"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/en-US/en-US.wav",
+      "bytes": 4145084,
+      "sha256": "ad8fa49a660ea770c1d92e6d2604a16e07e4d952d1e8289e265ea6478dd05a0f"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/en-US/en-US.srt",
+      "bytes": 1147,
+      "sha256": "ea104f6209015382cccb832bed314f64d528f76a348fc189d47d4805996d44c0"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/fr-FR/fr-FR.wav",
+      "bytes": 4145084,
+      "sha256": "9dd4fa2518c92b6bbd21c14ed467e436ce48b117d2fedca65ec3cbe3fed0af3c"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/fr-FR/fr-FR.srt",
+      "bytes": 1323,
+      "sha256": "d0b1eb1b9d8bda7da21564026149ba414aa64a295ff0696ef19cc9d65c419ab5"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/de-DE/de-DE.wav",
+      "bytes": 4145084,
+      "sha256": "4a6ddb74d1289fa9b8f5fd09f8a1a3be96b74244231f7c3f39934683838df36c"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/de-DE/de-DE.srt",
+      "bytes": 1337,
+      "sha256": "e97cef5c713a0732fca067e71b9ad4ffde00624750b1da32a23f8ff80d9448cc"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/es-ES/es-ES.wav",
+      "bytes": 4145084,
+      "sha256": "a83df9fd92c5b128c866ab2166518d4425f69f2f45845f86771851eade4b06b6"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/es-ES/es-ES.srt",
+      "bytes": 1310,
+      "sha256": "b61e500a4228681d377e8804f27c79b891ab11220c65eefcedc6ff0074d8cccd"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/it-IT/it-IT.wav",
+      "bytes": 4145084,
+      "sha256": "cb626930b482b8f6d554f49c58872ca14a0d7d27050009e70f5c436c05ac4046"
+    },
+    {
+      "path": "output/test_runs/2026-10-10_221229/youtube_upload/it-IT/it-IT.srt",
+      "bytes": 1296,
+      "sha256": "f0d08f89ae9ac91f8849af1d0a32fc6451a5bb44be81ae919402d53b22a48848"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/de_before.txt",
+      "bytes": 4886,
+      "sha256": "74d50f06f19ddb365fc17eb625d4af1d6a409ab0d7c6194fa1ce6f97a1f183ff"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/de_verified.txt",
+      "bytes": 6431,
+      "sha256": "5e4f8eb3a814ccd0bb8a1b65829f7a7f8488b8556c438ae248d8cd33907d9ca5"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/details_before.txt",
+      "bytes": 283,
+      "sha256": "d21cc8e3c7ca08b82eb9752ccea06fcf22799aa3241512f96f3066a5610f4538"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/en_verified.txt",
+      "bytes": 6938,
+      "sha256": "3c629a7142720d8f65c866760fe68a3fc579efb362c193d14282dd6a92d1a9b3"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/es_before.txt",
+      "bytes": 4372,
+      "sha256": "7803700e839e671cfefe8f54a0dee38c8adac3533bf6479dda1ae20efa2068f9"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/es_verified.txt",
+      "bytes": 6343,
+      "sha256": "31545db0c4322af85833a014a8bee7189799688729eb1116e7bd799e75cfeadf"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/fr_before.txt",
+      "bytes": 4780,
+      "sha256": "56ee6003b039c4ac2c5d30adcc29d75825af65929ce9fe1da83b6a22706e13c7"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/fr_verified.txt",
+      "bytes": 6275,
+      "sha256": "8ed2d18a185e6c1a5b9c145dd8bdb6f333cd902c1e3e1bdfc577627b6c72bfbf"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/it_before.txt",
+      "bytes": 4177,
+      "sha256": "f3a76d6609ee41fc86c84e50c74db9e985c61c78efdb151c1bf250d737ae4a22"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/it_verified.txt",
+      "bytes": 6255,
+      "sha256": "f8baeed0a64da0dcaa66c5d699967778d370b2145c0abad9794909de96da9581"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/metadata.json",
+      "bytes": 5374,
+      "sha256": "320dd58b15955e062dbe251dda0fee4407317401692201268b8578423a00850d"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/published_details.png",
+      "bytes": 104096,
+      "sha256": "639c2fe1d5bb3a70e8b22e1a4e747fb3779da2f4b40c8c399ec988ba9a424e2b"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/published_languages.png",
+      "bytes": 62297,
+      "sha256": "1ac27a5ee7a374e8f3011132a21c5aee04ec3420d09b01793250f24797af4a80"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/settings_verified.txt",
+      "bytes": 27489,
+      "sha256": "5474960b8bc72cddb8cdc0c3d7bebbb1fbc1b39d7d9ad650ee93c8e0ea538e09"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_metadata_publish/verification.json",
+      "bytes": 442,
+      "sha256": "78a04a7b11622dcbebbcd81b47a6441274c1a461b4642efe9494f73f70ba75cc"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_005305_content_review/source_contact_sheet.jpg",
+      "bytes": 118275,
+      "sha256": "f2fd1403889bf94d4015b7497f5b30b4b2724a8ec28f3973857339def3df215c"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_005305_content_review/subtitle_review_metrics.json",
+      "bytes": 21045,
+      "sha256": "ca16e52da6ad0e1a83ec5d22a348948af4b2482e09d1c478f5c2bc7f802ae6c6"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_005305_content_review/localized_metadata_before.json",
+      "bytes": 979,
+      "sha256": "fd590e29cda249ef8e84c7876e01c0de4028cc40c1f241e4a19a98abba22d4d0"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_005305_content_review/verified_product_links.json",
+      "bytes": 284,
+      "sha256": "d66ed1efea0febe9a36ae64eaf4a46dded9fc13a71f7076fec50ce2956b0e080"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_005305_content_review/verified_hexagon_product.txt",
+      "bytes": 33302,
+      "sha256": "eebd8281c1fba734faaeff9f7f713d6b34b301341222fb61f43ec16cfbdf3d17"
+    },
+    {
+      "path": "output/test_runs/2026-10-11_005305_content_review/inspect_source.py",
+      "bytes": 2292,
+      "sha256": "f0404c808eed0012bbc0eb877fef8ada4d6a6137919738868954fa012b7d2f46"
+    }
+  ],
+  "scope": "Six selected clean WAV/SRT pairs and published metadata/review evidence; no credentials, full provider history or alternate voice takes."
+}

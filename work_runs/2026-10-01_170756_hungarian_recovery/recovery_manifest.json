@@ -1,0 +1,59 @@
+{
+  "source_commit": "2e69428e08a03303ccf21acd8e9c2afb932d31f5",
+  "provider_calls": 0,
+  "provider_cost_usd": 0,
+  "recovered": [
+    {
+      "original_path": "output/test_runs/2026-09-26_170438/independent_review.json",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-26_170438\\independent_review.json",
+      "sha256": "2A0D4995A86ED3FA9721F9AB42FD64EA41AE00DEA5CA893F228DC515E3DE0F1B"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-26_170438/reviewed_hungarian_narration.json",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-26_170438\\reviewed_hungarian_narration.json",
+      "sha256": "D151BFCC936925C9D7857F55A49BCABCD8DF7B022786CC12EDD0781E1AA04961"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-26_170438/reviewed_video_analysis.json",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-26_170438\\reviewed_video_analysis.json",
+      "sha256": "2472F3C4E4D2F8A9011B21518579A90CAE79DC7F4D4C08EB7BBCE0A031EAF3A6"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-26_170438/run_summary.json",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-26_170438\\run_summary.json",
+      "sha256": "D3F695E657248BB0AF3EFB9408D46DD6EF61BFFB1A74A9C6155E3D0DED4CD233"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-27_000442/eleven_v3_natural_normalized.wav",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-27_000442\\eleven_v3_natural_normalized.wav",
+      "sha256": "BFDA0A1B260F17E30D94ECF0A0EEE6F8DA3251C6A5463C332AF46CC9E3B49EB0"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-27_000442/eleven_v3_natural_raw.mp3",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-27_000442\\eleven_v3_natural_raw.mp3",
+      "sha256": "44833553132E2EF964D144D2E37ECA768B545FDEA803FA865A86788F2E873485"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-27_000442/run_manifest.json",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-27_000442\\run_manifest.json",
+      "sha256": "37B4070A126F785F50E61A857B0F0C85E930F9CA0C26A55CC6774E4AB4897D6C"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-27_001434/captions_hu.srt",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-27_001434\\captions_hu.srt",
+      "sha256": "DA7786FE2ECACEBFD6D09CEF014E6D83E1C72B8FB32479A9C10D26E1C8BF2CD6"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-27_001434/render_synced_preview.py",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-27_001434\\render_synced_preview.py",
+      "sha256": "E44DC28EA2A959688CA0E6CC0D4FE3F386CDE128DD9E843717C9A9D90C215C7F"
+    },
+    {
+      "original_path": "output/test_runs/2026-09-27_001434/run_manifest.json",
+      "path": "work_runs\\2026-10-01_170756_hungarian_recovery\\recovered\\2026-09-27_001434\\run_manifest.json",
+      "sha256": "93A9541F749E197E08D71E56318DE056E8D2FBC40B707F8786096D9D631B4B1E"
+    }
+  ],
+  "validation": "Source video, accepted normalized voice, all four rebuilt segments, placed WAV and regenerated SRT match historical SHA-256; both previews decode successfully.",
+  "historical_paths": "Preserved historical manifests retain original deleted paths; rebuilt/run_manifest.json records current paths."
+}

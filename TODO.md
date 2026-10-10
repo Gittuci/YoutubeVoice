@@ -54,13 +54,22 @@ Priorities reflect current validated workflow evidence. Product and architectura
 - [ ] Add reproducible loudness normalization, short fades/crossfades, and placement validation while retaining natural pauses.
 - [ ] Derive subtitle timing from final synthesized speech and approved semantic units.
 - [ ] Ensure Phase 5 can reconstruct valid cached audio inputs when Phase 4 is skipped.
-- [ ] Benchmark Gemini 3.8 Flash TTS, Vertex alternatives, ElevenLabs, and viable local TTS per language using native blind listening.
+- [ ] Benchmark Gemini 3.8 Flash TTS, Vertex alternatives, ElevenLabs, and viable local TTS independently for EN/DE/ES/FR using native blind listening. Hungarian synthesis is optional and must not gate target-language candidates (D010).
 - [ ] Evaluate local TTS candidates, including XTTS-v2, for quality, runtime, voice preservation, and commercial licensing.
 - [ ] Keep professional voice cloning and ElevenLabs Dubbing v2 deferred until an explicit consent, cost, and quality test is approved.
 
 ## P2 — Export and UI
 
-- [ ] After explicit destructive/publish confirmation, replace the existing Hungarian descriptive audio/subtitles and English (United States) audio/subtitles on YouTube video `4sXe2lpaPqA`; preserve the Hungarian original and all French tracks unchanged.
+- [x] Publish and verify HU/EN/FR/DE/ES/IT branded titles/descriptions for `4sXe2lpaPqA`, verified product links and embedding enabled (2026-10-11; CODEX_HANDOFF.md).
+- [ ] Plan and validate English fallback for international viewers: current video still has Hungarian base metadata and silent Hungarian primary audio; preserve all six localizations when changing metadata base. English-primary exports for future uploads are proposed, not yet adopted or implemented. Do not promise deterministic language selection for Portuguese viewers.
+- [ ] Prepare a branded EZpiecer/Foltvilag custom thumbnail for the reference video; current auto-generated thumbnail remains unchanged.
+- [ ] Establish a repeatable music workflow with clean stems and previewed levels. Saved Studio music propagated to every language, but the requested change from 15% to 5% could not be applied; replacement-track behavior after Studio music edits remains untested.
+- [x] Complete the user-approved revised six-language Google audio/subtitle replacement on YouTube video `4sXe2lpaPqA`, preserving the primary silent audio (details in CODEX_HANDOFF.md).
+- [x] Complete the approved read-only OAuth caption inventory/backup pilot on `4sXe2lpaPqA`: six exact SRT backups, eight successful calls, 1251 quota units (docs/YOUTUBE_API_PILOT.md).
+- [x] Validate bounded draft caption upload/update/download/delete through the API: eight successful calls, 1401 quota units; original six caption IDs preserved.
+- [ ] Investigate the Hungarian descriptive-audio caption chooser issue: all six API caption audioTrackType fields are unknown. Approved Not applicable relabel blocked Studio language management and was reverted; ordinary Hungarian audio remains unresolved.
+- [ ] Resolve OAuth External/Testing seven-day refresh-token expiry before unattended long-term publishing; assess production/verification requirements without silently publishing the OAuth app.
+- [ ] After the pilot, implement resumable YouTube publishing with API caption/metadata management and a separately validated Studio audio uploader; preserve remote backups and skip unchanged assets.
 - [ ] Update FCPXML generation to consume the canonical project document and validated media manifest.
 - [ ] Fix `scan_output_dir()` using undefined `wav_dir`.
 - [ ] Implement the Streamlit full-pipeline action.

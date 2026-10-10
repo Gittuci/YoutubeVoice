@@ -8,3 +8,5 @@ __pycache__/
 *.mp4
 .venv/
 vertex-key.json
+.local/youtube/
+work_runs/2026-10-11_handoff/media_and_metadata.zip

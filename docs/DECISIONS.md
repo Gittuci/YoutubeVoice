@@ -75,3 +75,19 @@ Current experiment details and provider measurements belong in [CODEX_HANDOFF.md
 **Evidence:** For the controlled English test, the user rejected the assumption that a Hungarian-configured voice would be the best English default, selected ElevenLabs voice `XrExE9yKIg1WjnnlVkGX`, and accepted its English narration and synchronized preview.
 
 **Consequence:** The selected English voice is a sample-specific baseline, not a universal multilingual voice. German, Spanish, and French still require their own direct localization and native-listener voice review.
+
+## D010 — Foreign-language TTS is the priority; Hungarian synthesis is optional
+
+**Decision:** TTS selection and benchmarking prioritize natural instructional narration in English, German, Spanish, and French. Hungarian TTS is a nice-to-have because the users can record Hungarian narration themselves.
+
+**Basis:** Explicit user clarification on 2026-10-08.
+
+**Consequence:** Missing or weaker Hungarian synthesis must not disqualify a model that performs well in a target language. Evaluate provider/model/voice combinations independently per language; one provider need not cover every language. Hungarian/source meaning remains the basis for direct localization. The accepted Hungarian TTS baseline remains a historical quality reference, not a prerequisite for foreign-language provider selection. This decision does not implement recorded-narration support or approve a new model test.
+
+## D011 — Tutorials support Foltvilag and EZpiecer brand discovery and sales
+
+**Decision:** Public tutorial titles and descriptions should naturally identify Foltvilag and its EZpiecer templates, while leading with the instructional purpose. Descriptions identify Foltvilag Kft. and link directly to the demonstrated product in the company's shop. Avoid repetitive brand mentions and unsupported product claims.
+
+**Basis:** Explicit user direction and approved Hungarian wording on 2026-10-11. Hungarian display copy may use Foltvilág; the company attribution uses Foltvilag Kft. Foreign-language copy uses Foltvilag and preserves EZpiecer.
+
+**Consequence:** Localize metadata directly from approved Hungarian meaning. Use verified shop locale links; disclose English product-page fallbacks where a corresponding shop locale has not been verified. This is an editorial policy, not an implemented automated publishing pipeline.

@@ -1,0 +1,39 @@
+{
+  "status": "Locally reviewed candidate; no TTS generated",
+  "timing_policy": "Natural sentence flow with placement flexibility. No time-stretching assumed.",
+  "segments": [
+    {
+      "id": "reviewed_narr_01",
+      "suggested_start_seconds": 1.0,
+      "suggested_end_seconds": 14.5,
+      "text_hu": "A kiszabott hatszög közepére igazítjuk az átlátszó sablont, majd a nyílásokon át két gombostűvel rögzítjük, hogy hajtogatás közben ne csússzon el.",
+      "evidence_basis": ["reviewed_01", "reviewed_02"],
+      "optional_teaching_explanation": "A rögzítés csökkenti a sablon elmozdulását; ez észszerű oktatói magyarázat, nem külön látható esemény."
+    },
+    {
+      "id": "reviewed_narr_02",
+      "suggested_start_seconds": 16.0,
+      "suggested_end_seconds": 43.0,
+      "text_hu": "A széleken maradt varrásráhagyást sorban a sablonra hajtjuk. A sarkoknál az egymásra kerülő textilrétegeket apró kézi öltésekkel fogjuk össze; a tű csak a textilen halad át.",
+      "evidence_basis": ["reviewed_03"],
+      "optional_teaching_explanation": null
+    },
+    {
+      "id": "reviewed_narr_03",
+      "suggested_start_seconds": 44.0,
+      "suggested_end_seconds": 72.5,
+      "text_hu": "A darabot folyamatosan forgatva haladunk körbe. Minden új oldalt a sablon élére simítunk, majd a következő saroknál rögzítjük a hajtást.",
+      "evidence_basis": ["reviewed_03"],
+      "optional_teaching_explanation": null
+    },
+    {
+      "id": "reviewed_narr_04",
+      "suggested_start_seconds": 73.5,
+      "suggested_end_seconds": 86.0,
+      "text_hu": "Amikor körbeértünk, elvágjuk a cérnát, és kihúzzuk a két rögzítőtűt. A sablon ekkor még a textilben marad, a behajtott hatszögelem pedig elkészült.",
+      "evidence_basis": ["reviewed_04", "reviewed_05"],
+      "optional_teaching_explanation": null
+    }
+  ],
+  "continuous_script_hu": "A kiszabott hatszög közepére igazítjuk az átlátszó sablont, majd a nyílásokon át két gombostűvel rögzítjük, hogy hajtogatás közben ne csússzon el. A széleken maradt varrásráhagyást sorban a sablonra hajtjuk. A sarkoknál az egymásra kerülő textilrétegeket apró kézi öltésekkel fogjuk össze; a tű csak a textilen halad át. A darabot folyamatosan forgatva haladunk körbe. Minden új oldalt a sablon élére simítunk, majd a következő saroknál rögzítjük a hajtást. Amikor körbeértünk, elvágjuk a cérnát, és kihúzzuk a két rögzítőtűt. A sablon ekkor még a textilben marad, a behajtott hatszögelem pedig elkészült."
+}
